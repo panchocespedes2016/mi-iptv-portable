@@ -610,8 +610,14 @@ $('btn-close').onclick = () => { stopPlayer(); modal.classList.add('hidden'); };
 $('btn-vlc').onclick = async () => {
   const url = modal.dataset.url;
   if (!url) return;
-  if (isTauri) await tauriInvoke('open_external', { url });
-  else window.open(url, '_blank');
+  if (isTauri) {
+    try {
+      const how = await tauriInvoke('open_external', { url });
+      if (how === 'default') toast('VLC no encontrado; se abrió con la app predeterminada');
+    } catch (e) { toast('No se pudo abrir: ' + (e?.message || e)); }
+    return;
+  }
+  window.open(url, '_blank');
 };
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;

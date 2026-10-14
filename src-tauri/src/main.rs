@@ -54,11 +54,44 @@ async fn http_get(url: String) -> Result<String, String> {
     resp.text().await.map_err(|e| format!("leer cuerpo: {e}"))
 }
 
+/// Busca vlc.exe: instalación estándar, variables de entorno y
+/// portable junto al exe (misma filosofía portable de la app).
+#[cfg(target_os = "windows")]
+fn find_vlc() -> Option<std::path::PathBuf> {
+    let mut cands = Vec::new();
+    for var in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
+        if let Ok(pf) = std::env::var(var) {
+            cands.push(
+                std::path::PathBuf::from(pf)
+                    .join("VideoLAN")
+                    .join("VLC")
+                    .join("vlc.exe"),
+            );
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            cands.push(dir.join("vlc").join("vlc.exe"));
+            cands.push(dir.join("vlc.exe"));
+        }
+    }
+    cands.into_iter().find(|p| p.is_file())
+}
+
+/// Abre la URL en VLC si está instalado; si no, usa el manejador
+/// predeterminado del sistema. Devuelve "vlc" o "default".
 #[tauri::command]
-fn open_external(url: String) -> Result<(), String> {
-    // v1: delega al handler del sistema (VLC si es el predeterminado).
-    // Fase 2: detectar vlc.exe portable/instalado y pasarlo explícito.
-    open::that(&url).map_err(|e| format!("abrir externo: {e}"))
+fn open_external(url: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    if let Some(exe) = find_vlc() {
+        std::process::Command::new(exe)
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("abrir en VLC: {e}"))?;
+        return Ok("vlc".into());
+    }
+    open::that(&url).map_err(|e| format!("abrir externo: {e}"))?;
+    Ok("default".into())
 }
 
 fn main() {
