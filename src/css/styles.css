@@ -46,6 +46,17 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 #ser-back { margin-bottom: 8px; }
 .catbar { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 6px; }
 .catbar .grp { flex-shrink: 0; white-space: nowrap; }
+/* Ficha de película/serie */
+.detail { display: flex; gap: 20px; margin: 12px 0 20px; }
+.detail-poster { width: 200px; border-radius: 10px; align-self: flex-start; flex-shrink: 0; }
+.detail-info { flex: 1; min-width: 0; }
+.detail-info h2 { margin-bottom: 8px; }
+.detail-info .meta { color: var(--muted); margin-bottom: 12px; }
+.detail-info .plot { margin-bottom: 12px; line-height: 1.5; }
+.detail-info .cast { color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+.play-btn { background: var(--accent); border-color: var(--accent); color: #fff;
+  font-size: 1.1rem; padding: 12px 28px; margin-top: 12px; }
+#detail-back { margin-bottom: 4px; }
 .ch { background: var(--panel); border-radius: 10px; padding: 10px; display: flex; gap: 10px;
   align-items: center; cursor: pointer; }
 .ch:hover { background: var(--panel2); }
@@ -62,8 +73,17 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 .epg-ch { width: 200px; flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
 .epg-ch img { width: 36px; height: 36px; object-fit: contain; background: #000; border-radius: 4px; }
 .epg-progs { display: flex; gap: 8px; overflow-x: auto; align-items: center; }
-.epg-p { background: var(--panel); padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: .85rem; }
+.epg-p { background: var(--panel); padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+  font-size: .85rem; border: none; color: var(--text); cursor: pointer; font-family: inherit; text-align: left; }
+.epg-p:hover { background: var(--panel2); }
 .epg-p.live { background: var(--accent); color: #fff; }
+/* Modal de ficha (programa EPG) */
+#info-modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex;
+  align-items: center; justify-content: center; z-index: 60; }
+#info-modal.hidden { display: none; }
+.info-card { background: var(--panel); border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; }
+.info-card .meta { color: var(--muted); margin: 8px 0 12px; font-size: .9rem; }
+.info-card p { line-height: 1.5; margin-bottom: 16px; white-space: pre-wrap; }
 
 /* Ajustes */
 .profile { background: var(--panel); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;

@@ -18,6 +18,7 @@ const state = {
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
   openSeries: null, // {info} serie abierta
+  openMovie: null, // {item, info, data} película abierta
 };
 
 // ------------------------------------------------------------- almacenamiento
@@ -62,6 +63,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
 // ------------------------------------------------------------- películas VOD
 async function renderMovies() {
+  if (state.openMovie) return renderMovieDetail();
   const p = state.activeProfile;
   if (p?.type !== 'xtream' || !p._xt) {
     $('vod-cats').innerHTML = '';
@@ -107,14 +109,13 @@ function renderMoviesGrid() {
     </div>`).join('') || '<p class="hint">Sin películas en este grupo.</p>';
   $('movies-list').querySelectorAll('[data-vod]').forEach(el => el.onclick = () => {
     const v = state.vod.find(x => String(x.stream_id) === el.dataset.vod);
-    const p = state.activeProfile;
-    playStream(p._xt.movieUrl(v.stream_id, v.container_extension || 'mp4'), v.name);
+    if (v) showMovieDetail(v);
   });
 }
 
 // ------------------------------------------------------------------ series
 async function renderSeriesList() {
-  if (state.openSeries) return renderEpisodes();
+  if (state.openSeries) return renderSeriesDetail();
   const p = state.activeProfile;
   if (p?.type !== 'xtream' || !p._xt) {
     $('series-cats').innerHTML = '';
@@ -159,13 +160,9 @@ function renderSeriesGrid() {
       ${s.cover ? `<img src="${esc(s.cover)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
       <div class="ch-info"><b>${esc(s.name)}</b><small>${esc(s.genre || '')}</small></div>
     </div>`).join('') || '<p class="hint">Sin series en este grupo.</p>';
-  $('series-list').querySelectorAll('[data-ser]').forEach(el => el.onclick = async () => {
-    const p = state.activeProfile;
-    toast('Cargando episodios…');
-    try {
-      state.openSeries = await p._xt.seriesInfo(el.dataset.ser);
-      renderEpisodes();
-    } catch (e) { toast('Error: ' + e.message); }
+  $('series-list').querySelectorAll('[data-ser]').forEach(el => el.onclick = () => {
+    const s = state.series.find(x => String(x.series_id) === el.dataset.ser);
+    if (s) showSeriesDetail(s);
   });
 }
 
@@ -180,12 +177,80 @@ function seasonsOf(info) {
   ]);
 }
 
-function renderEpisodes() {
+// ------------------------------------------------------- ficha de película
+async function showMovieDetail(v) {
+  const p = state.activeProfile;
+  if (!p?._xt) return;
+  toast('Cargando información…');
+  try {
+    const d = await p._xt.vodInfo(v.stream_id);
+    state.openMovie = { item: v, info: d.info || {}, data: d.movie_data || {} };
+    renderMovieDetail();
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+function detailMeta(info) {
+  return [info.genre, info.rating ? '★' + info.rating : null,
+          info.releaseDate || info.releasedate || null]
+    .filter(Boolean).join(' · ');
+}
+
+function renderMovieDetail() {
+  const { item, info } = state.openMovie;
+  const p = state.activeProfile;
+  $('vod-cats').innerHTML = '';
+  const poster = info.movie_image || item.stream_icon || '';
+  const meta = detailMeta(info);
+  $('movies-list').innerHTML = `
+    <button id="detail-back">← Volver</button>
+    <div class="detail">
+      ${poster ? `<img class="detail-poster" src="${esc(poster)}" onerror="this.remove()">` : ''}
+      <div class="detail-info">
+        <h2>${esc(info.name || info.o_name || item.name)}</h2>
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
+        ${info.plot ? `<p class="plot">${esc(info.plot)}</p>` : ''}
+        ${info.cast ? `<p class="cast"><b>Reparto:</b> ${esc(info.cast)}</p>` : ''}
+        ${info.director ? `<p class="cast"><b>Director:</b> ${esc(info.director)}</p>` : ''}
+        <button id="detail-play" class="play-btn">▶ Reproducir</button>
+      </div>
+    </div>`;
+  $('detail-back').onclick = () => { state.openMovie = null; renderMovies(); };
+  $('detail-play').onclick = () => {
+    const ext = info.container_extension || item.container_extension || 'mp4';
+    playStream(p._xt.movieUrl(item.stream_id, ext), info.name || item.name);
+  };
+}
+
+// ---------------------------------------------------------- ficha de serie
+async function showSeriesDetail(s) {
+  const p = state.activeProfile;
+  if (!p?._xt) return;
+  toast('Cargando información…');
+  try {
+    state.openSeries = await p._xt.seriesInfo(s.series_id);
+    renderSeriesDetail();
+  } catch (e) { toast('Error: ' + e.message); }
+}
+
+function renderSeriesDetail() {
   const info = state.openSeries;
+  const det = info.info || {};
+  const p = state.activeProfile;
   const seasons = seasonsOf(info);
   const allEps = seasons.flatMap(([, eps]) => eps);
-  const p = state.activeProfile;
-  let html = `<button id="ser-back">← Volver a series</button><h3>${esc(info.info?.name || '')}</h3>`;
+  $('series-cats').innerHTML = '';
+  const meta = detailMeta(det);
+  let html = `
+    <button id="detail-back">← Volver</button>
+    <div class="detail">
+      ${det.cover ? `<img class="detail-poster" src="${esc(det.cover)}" onerror="this.remove()">` : ''}
+      <div class="detail-info">
+        <h2>${esc(det.name || '')}</h2>
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}
+        ${det.plot ? `<p class="plot">${esc(det.plot)}</p>` : ''}
+        ${det.cast ? `<p class="cast"><b>Reparto:</b> ${esc(det.cast)}</p>` : ''}
+      </div>
+    </div>`;
   for (const [sn, eps] of seasons) {
     html += `<h3>${sn ? 'Temporada ' + esc(sn) : 'Episodios'}</h3><div class="ep-grid">` + eps.map(ep => `
       <button class="ep" data-ep="${ep.id}">${esc(ep.episode_num ? 'E' + ep.episode_num + ' — ' : '')}${esc(ep.title || ('Episodio ' + (ep.episode_num || '')))}</button>`
@@ -193,12 +258,12 @@ function renderEpisodes() {
   }
   if (!allEps.length) html += '<p class="hint">Esta serie no trae episodios en el proveedor.</p>';
   $('series-list').innerHTML = html;
-  $('ser-back').onclick = () => { state.openSeries = null; renderSeriesList(); };
+  $('detail-back').onclick = () => { state.openSeries = null; renderSeriesList(); };
   $('series-list').querySelectorAll('[data-ep]').forEach(b => b.onclick = () => {
     const ep = allEps.find(x => String(x.id) === b.dataset.ep);
     if (!ep) return toast('Episodio no disponible');
     playStream(p._xt.episodeUrl(ep.id, ep.container_extension || 'mp4'),
-      `${info.info?.name || ''} E${ep.episode_num || ''}`);
+      `${det.name || ''} E${ep.episode_num || ''}`);
   });
 }
 
@@ -246,7 +311,7 @@ function renderProfiles() {
       state.channels = []; state.groups = []; state.epg = null;
       state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
       state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
-      state.openSeries = null;
+      state.openSeries = null; state.openMovie = null;
       renderGroups(); renderChannels();
       $('active-source').textContent = 'Sin fuente';
     }
@@ -293,7 +358,7 @@ async function loadProfile(id) {
     state.groupFilter = null; state.search = '';
     state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
     state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
-    state.openSeries = null;
+    state.openSeries = null; state.openMovie = null;
     $('active-source').textContent = 'Fuente: ' + p.name;
     renderGroups(); renderChannels();
     toast(`Listo: ${state.channels.length} canales`);
@@ -413,17 +478,34 @@ function renderGuide() {
   }
   const now = Date.now(), from = now - 3600000, to = now + 3 * 3600000;
   const chans = state.channels.filter(c => state.epg.channels.has(channelEpgId(c))).slice(0, 60);
+  state.epgShown = [];
   box.innerHTML = chans.map(c => {
     const progs = programsFor(state.epg.programs, channelEpgId(c), from, to);
+    const items = progs.map(p => {
+      const i = state.epgShown.length;
+      state.epgShown.push({ ...p, channelName: c.name });
+      const live = p.start <= now && p.stop > now;
+      const t = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `<button class="epg-p ${live ? 'live' : ''}" data-epg="${i}">${t} ${esc(p.title)}</button>`;
+    }).join('');
     return `<div class="epg-row">
       <div class="epg-ch">${c.logo ? `<img src="${esc(c.logo)}" onerror="this.remove()">` : ''}<b>${esc(c.name)}</b></div>
-      <div class="epg-progs">${progs.map(p => {
-        const live = p.start <= now && p.stop > now;
-        const t = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return `<span class="epg-p ${live ? 'live' : ''}" title="${esc(p.desc || '')}">${t} ${esc(p.title)}</span>`;
-      }).join('') || '<span class="hint">sin datos</span>'}</div>
+      <div class="epg-progs">${items || '<span class="hint">sin datos</span>'}</div>
     </div>`;
   }).join('');
+  box.querySelectorAll('[data-epg]').forEach(b => b.onclick = () => showProgramDetail(state.epgShown[+b.dataset.epg]));
+}
+
+/** Ficha del programa de la guía: título, canal, horario y descripción completa. */
+function showProgramDetail(p) {
+  if (!p) return;
+  $('info-title').textContent = p.title || 'Sin título';
+  const d = new Date(p.start).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const t1 = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const t2 = new Date(p.stop).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  $('info-meta').textContent = `${p.channelName} · ${d} · ${t1} – ${t2}`;
+  $('info-desc').textContent = p.desc || 'Sin descripción.';
+  $('info-modal').classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------- favoritos
@@ -532,7 +614,13 @@ $('btn-vlc').onclick = async () => {
   else window.open(url, '_blank');
 };
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !modal.classList.contains('hidden')) $('btn-close').click();
+  if (e.key !== 'Escape') return;
+  if (!$('info-modal').classList.contains('hidden')) $('info-modal').classList.add('hidden');
+  else if (!modal.classList.contains('hidden')) $('btn-close').click();
+});
+$('info-close').onclick = () => $('info-modal').classList.add('hidden');
+$('info-modal').addEventListener('click', e => {
+  if (e.target.id === 'info-modal') $('info-modal').classList.add('hidden');
 });
 
 // ----------------------------------------------------------------- arranque

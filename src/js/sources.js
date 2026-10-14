@@ -98,6 +98,7 @@ export class Xtream {
   seriesCategories(){ return this.api({ action: 'get_series_categories' }); }
   series(cat = '')       { return this.api({ action: 'get_series', ...(cat ? { category_id: cat } : {}) }); }
   seriesInfo(id)    { return this.api({ action: 'get_series_info', series_id: id }); }
+  vodInfo(vodId)    { return this.api({ action: 'get_vod_info', vod_id: vodId }); }
   shortEpg(streamId, limit = 4) { return this.api({ action: 'get_short_epg', stream_id: streamId, limit }); }
   epgXml() { // puede ser pesado; con gzip lo maneja Rust
     const q = new URLSearchParams({ username: this.u, password: this.p });
