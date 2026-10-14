@@ -12,7 +12,8 @@
         "title": "MiIPTV Portable",
         "width": 1280
       }
-    ]
+    ],
+    "withGlobalTauri": true
   },
   "build": {
     "beforeBuildCommand": "",
