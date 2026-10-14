@@ -1,0 +1,43 @@
+name: build-windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: src-tauri
+          args: --no-bundle
+
+      - name: Empaquetar zip portable
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release/mi-iptv-portable.exe | Select-Object -First 1
+          if (-not $exe) { throw "No se encontró el .exe compilado" }
+          Compress-Archive -Path $exe.FullName -DestinationPath MiIPTV-Portable-win64.zip -Force
+          Get-ChildItem MiIPTV-Portable-win64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MiIPTV-Portable-win64
+          path: MiIPTV-Portable-win64.zip

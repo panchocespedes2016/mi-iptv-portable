@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-shell": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "name": "mi-iptv-portable",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}

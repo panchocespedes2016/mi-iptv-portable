@@ -1,0 +1,88 @@
+/* MiIPTV Portable — tema oscuro estilo iMPlayer */
+:root {
+  --bg: #0f1419;
+  --panel: #182028;
+  --panel2: #1f2933;
+  --accent: #e50914;
+  --text: #e8eef4;
+  --muted: #8a97a5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; }
+#app { display: flex; height: 100vh; }
+#sidebar { width: 230px; background: var(--panel); display: flex; flex-direction: column; padding: 16px 10px; flex-shrink: 0; }
+.logo { font-size: 1.3rem; font-weight: 700; padding: 8px 12px 6px; }
+.source { font-size: .8rem; color: var(--muted); padding: 0 12px 14px; }
+.nav-btn { display: block; width: 100%; text-align: left; background: none; border: none;
+  color: var(--text); padding: 12px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+.nav-btn:hover { background: var(--panel2); }
+.nav-btn.active { background: var(--accent); color: #fff; }
+.version { margin-top: auto; color: var(--muted); font-size: .8rem; padding: 8px 12px; }
+#content { flex: 1; padding: 20px 24px; overflow-y: auto; }
+.view { display: none; }
+.view.active { display: block; }
+.hint { color: var(--muted); margin-top: 12px; }
+h2 { margin-bottom: 14px; }
+h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform: uppercase; }
+
+/* TV en vivo */
+.live-layout { display: flex; gap: 16px; height: calc(100vh - 60px); }
+#groups { width: 220px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.grp { background: var(--panel); border: none; color: var(--text); text-align: left;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; }
+.grp span { color: var(--muted); font-size: .8rem; }
+.grp.active { background: var(--accent); color: #fff; }
+.grp.active span { color: #fff; }
+.live-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#live-search, #pf-fields input, #pf-type {
+  background: var(--panel); border: 1px solid #2c3947; color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font-size: 1rem; margin-bottom: 12px; width: 100%; max-width: 480px; }
+#live-list, #favs-list, #movies-list, #series-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px; overflow-y: auto; padding-bottom: 20px; }
+#movies-search, #series-search { background: var(--panel); border: 1px solid #2c3947; color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font-size: 1rem; margin-bottom: 12px; width: 100%; max-width: 480px; }
+.ep-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.ep { text-align: left; }
+#ser-back { margin-bottom: 8px; }
+.ch { background: var(--panel); border-radius: 10px; padding: 10px; display: flex; gap: 10px;
+  align-items: center; cursor: pointer; }
+.ch:hover { background: var(--panel2); }
+.ch img { width: 48px; height: 48px; object-fit: contain; background: #000; border-radius: 6px; flex-shrink: 0; }
+.no-logo { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; background: var(--panel2); border-radius: 6px; flex-shrink: 0; }
+.ch-info { flex: 1; min-width: 0; }
+.ch-info b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .92rem; }
+.ch-info small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: gold; }
+
+/* Guía EPG */
+.epg-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #1d2630; }
+.epg-ch { width: 200px; flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
+.epg-ch img { width: 36px; height: 36px; object-fit: contain; background: #000; border-radius: 4px; }
+.epg-progs { display: flex; gap: 8px; overflow-x: auto; align-items: center; }
+.epg-p { background: var(--panel); padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: .85rem; }
+.epg-p.live { background: var(--accent); color: #fff; }
+
+/* Ajustes */
+.profile { background: var(--panel); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center; max-width: 640px; }
+.profile small { color: var(--muted); }
+.profile .row { display: flex; gap: 8px; }
+button, #pf-fields button { background: var(--panel2); color: var(--text); border: 1px solid #33404d;
+  border-radius: 8px; padding: 9px 14px; cursor: pointer; font-size: .95rem; }
+button:hover { border-color: var(--accent); }
+button.danger { color: #ff6b6b; }
+.file { display: block; margin-bottom: 12px; color: var(--muted); }
+
+/* Reproductor */
+#player-modal { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; z-index: 50; }
+#player-modal.hidden { display: none; }
+#video { flex: 1; width: 100%; background: #000; min-height: 0; }
+.player-bar { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: var(--panel); }
+#now-playing { flex: 1; color: var(--muted); }
+
+/* Toast */
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: #222d38; color: var(--text); padding: 12px 20px; border-radius: 10px;
+  opacity: 0; transition: all .25s; pointer-events: none; z-index: 100; max-width: 80%; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

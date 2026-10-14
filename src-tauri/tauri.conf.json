@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "height": 800,
+        "minHeight": 600,
+        "minWidth": 900,
+        "title": "MiIPTV Portable",
+        "width": 1280
+      }
+    ]
+  },
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../src"
+  },
+  "bundle": {
+    "active": true,
+    "icon": [],
+    "targets": "all"
+  },
+  "identifier": "com.lice.miiptvportable",
+  "productName": "MiIPTV Portable",
+  "version": "0.1.0"
+}
