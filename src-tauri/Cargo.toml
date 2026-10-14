@@ -1,6 +1,6 @@
 [package]
 name = "mi-iptv-portable"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "Reproductor IPTV portable para Windows (clon funcional estilo iMPlayer, implementacion original)"
 
