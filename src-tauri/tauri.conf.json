@@ -22,7 +22,10 @@
   },
   "bundle": {
     "active": true,
-    "icon": [],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
     "targets": "all"
   },
   "identifier": "com.lice.miiptvportable",
