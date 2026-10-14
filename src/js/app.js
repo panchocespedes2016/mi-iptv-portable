@@ -118,22 +118,36 @@ async function renderSeriesList() {
   });
 }
 
+/** Normaliza las temporadas de get_series_info a [[nombreTemporada, [episodios]]].
+ *  Algunos proveedores devuelven objetos en vez de arreglos por temporada. */
+function seasonsOf(info) {
+  const raw = info.seasons || info.episodes || {};
+  if (Array.isArray(raw)) return [['', raw]];
+  return Object.entries(raw).map(([sn, eps]) => [
+    sn,
+    Array.isArray(eps) ? eps : (eps && typeof eps === 'object' ? [eps] : []),
+  ]);
+}
+
 function renderEpisodes() {
   const info = state.openSeries;
-  const seasons = info.seasons || info.episodes || {};
+  const seasons = seasonsOf(info);
+  const allEps = seasons.flatMap(([, eps]) => eps);
   const p = state.activeProfile;
   let html = `<button id="ser-back">← Volver a series</button><h3>${esc(info.info?.name || '')}</h3>`;
-  for (const [sn, eps] of Object.entries(seasons)) {
-    html += `<h3>Temporada ${esc(sn)}</h3><div class="ep-grid">` + eps.map(ep => `
-      <button class="ep" data-ep="${ep.id}">${esc(ep.episode_num ? 'E' + ep.episode_num + ' — ' : '')}${esc(ep.title || '')}</button>`
+  for (const [sn, eps] of seasons) {
+    html += `<h3>${sn ? 'Temporada ' + esc(sn) : 'Episodios'}</h3><div class="ep-grid">` + eps.map(ep => `
+      <button class="ep" data-ep="${ep.id}">${esc(ep.episode_num ? 'E' + ep.episode_num + ' — ' : '')}${esc(ep.title || ('Episodio ' + (ep.episode_num || '')))}</button>`
     ).join('') + `</div>`;
   }
+  if (!allEps.length) html += '<p class="hint">Esta serie no trae episodios en el proveedor.</p>';
   $('series-list').innerHTML = html;
   $('ser-back').onclick = () => { state.openSeries = null; renderSeriesList(); };
   $('series-list').querySelectorAll('[data-ep]').forEach(b => b.onclick = () => {
-    const ep = Object.values(seasons).flat().find(x => String(x.id) === b.dataset.ep);
+    const ep = allEps.find(x => String(x.id) === b.dataset.ep);
+    if (!ep) return toast('Episodio no disponible');
     playStream(p._xt.episodeUrl(ep.id, ep.container_extension || 'mp4'),
-      `${info.info?.name} E${ep.episode_num}`);
+      `${info.info?.name || ''} E${ep.episode_num || ''}`);
   });
 }
 
