@@ -15,8 +15,8 @@ const state = {
   search: '',
   lastProfileId: null,
   settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
-  vod: [], vodLoaded: false, vodSearch: '',
-  series: [], seriesLoaded: false, seriesSearch: '',
+  vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
+  series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
   openSeries: null, // {info} serie abierta
 };
 
@@ -61,25 +61,50 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 });
 
 // ------------------------------------------------------------- películas VOD
-async function ensureVod() {
+async function renderMovies() {
   const p = state.activeProfile;
-  if (state.vodLoaded || p?.type !== 'xtream' || !p._xt) return;
-  toast('Cargando películas…');
-  try {
-    state.vod = await p._xt.vodStreams();
-    state.vodLoaded = true;
-  } catch (e) { toast('Error VOD: ' + e.message); }
+  if (p?.type !== 'xtream' || !p._xt) {
+    $('vod-cats').innerHTML = '';
+    $('movies-list').innerHTML = '<p class="hint">Carga un perfil Xtream en Ajustes.</p>';
+    return;
+  }
+  if (!state.vodCats.length) {
+    try { state.vodCats = await p._xt.vodCategories(); }
+    catch (e) { console.warn('cats VOD:', e.message); }
+  }
+  if (!state.vodLoaded) {
+    toast('Cargando películas…');
+    try {
+      state.vod = await p._xt.vodStreams(state.vodCat || '');
+      state.vodLoaded = true;
+    } catch (e) { toast('Error VOD: ' + e.message); }
+  }
+  renderVodCats();
+  renderMoviesGrid();
 }
 
-async function renderMovies() {
-  await ensureVod();
+function renderVodCats() {
+  const box = $('vod-cats');
+  if (!state.vodCats.length) { box.innerHTML = ''; return; }
+  const cur = String(state.vodCat ?? '');
+  const mk = (id, name) =>
+    `<button class="grp ${cur === String(id ?? '') ? 'active' : ''}" data-vc="${id ?? ''}">${esc(name)}</button>`;
+  box.innerHTML = mk(null, 'Todas') + state.vodCats.map(c => mk(c.category_id, c.category_name)).join('');
+  box.querySelectorAll('[data-vc]').forEach(b => b.onclick = () => {
+    state.vodCat = b.dataset.vc || null;
+    state.vodLoaded = false;
+    renderMovies();
+  });
+}
+
+function renderMoviesGrid() {
   const q = state.vodSearch.toLowerCase();
   const list = state.vod.filter(v => !q || v.name.toLowerCase().includes(q)).slice(0, 300);
   $('movies-list').innerHTML = list.map(v => `
     <div class="ch vod" data-vod="${v.stream_id}">
       ${v.stream_icon ? `<img src="${esc(v.stream_icon)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">🎬</div>'}
       <div class="ch-info"><b>${esc(v.name)}</b><small>${esc(v.container_extension || '')} ${v.rating ? '★' + v.rating : ''}</small></div>
-    </div>`).join('') || '<p class="hint">Sin películas. Carga un perfil Xtream en Ajustes.</p>';
+    </div>`).join('') || '<p class="hint">Sin películas en este grupo.</p>';
   $('movies-list').querySelectorAll('[data-vod]').forEach(el => el.onclick = () => {
     const v = state.vod.find(x => String(x.stream_id) === el.dataset.vod);
     const p = state.activeProfile;
@@ -88,26 +113,52 @@ async function renderMovies() {
 }
 
 // ------------------------------------------------------------------ series
-async function ensureSeries() {
-  const p = state.activeProfile;
-  if (state.seriesLoaded || p?.type !== 'xtream' || !p._xt) return;
-  toast('Cargando series…');
-  try {
-    state.series = await p._xt.series();
-    state.seriesLoaded = true;
-  } catch (e) { toast('Error series: ' + e.message); }
-}
-
 async function renderSeriesList() {
   if (state.openSeries) return renderEpisodes();
-  await ensureSeries();
+  const p = state.activeProfile;
+  if (p?.type !== 'xtream' || !p._xt) {
+    $('series-cats').innerHTML = '';
+    $('series-list').innerHTML = '<p class="hint">Carga un perfil Xtream en Ajustes.</p>';
+    return;
+  }
+  if (!state.seriesCats.length) {
+    try { state.seriesCats = await p._xt.seriesCategories(); }
+    catch (e) { console.warn('cats series:', e.message); }
+  }
+  if (!state.seriesLoaded) {
+    toast('Cargando series…');
+    try {
+      state.series = await p._xt.series(state.seriesCat || '');
+      state.seriesLoaded = true;
+    } catch (e) { toast('Error series: ' + e.message); }
+  }
+  renderSeriesCats();
+  renderSeriesGrid();
+}
+
+function renderSeriesCats() {
+  const box = $('series-cats');
+  if (!state.seriesCats.length) { box.innerHTML = ''; return; }
+  const cur = String(state.seriesCat ?? '');
+  const mk = (id, name) =>
+    `<button class="grp ${cur === String(id ?? '') ? 'active' : ''}" data-sc="${id ?? ''}">${esc(name)}</button>`;
+  box.innerHTML = mk(null, 'Todas') + state.seriesCats.map(c => mk(c.category_id, c.category_name)).join('');
+  box.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
+    state.seriesCat = b.dataset.sc || null;
+    state.seriesLoaded = false;
+    state.openSeries = null;
+    renderSeriesList();
+  });
+}
+
+function renderSeriesGrid() {
   const q = state.seriesSearch.toLowerCase();
   const list = state.series.filter(s => !q || s.name.toLowerCase().includes(q)).slice(0, 300);
   $('series-list').innerHTML = list.map(s => `
     <div class="ch vod" data-ser="${s.series_id}">
       ${s.cover ? `<img src="${esc(s.cover)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
       <div class="ch-info"><b>${esc(s.name)}</b><small>${esc(s.genre || '')}</small></div>
-    </div>`).join('') || '<p class="hint">Sin series. Carga un perfil Xtream en Ajustes.</p>';
+    </div>`).join('') || '<p class="hint">Sin series en este grupo.</p>';
   $('series-list').querySelectorAll('[data-ser]').forEach(el => el.onclick = async () => {
     const p = state.activeProfile;
     toast('Cargando episodios…');
@@ -193,8 +244,9 @@ function renderProfiles() {
     if (state.activeProfile?.id === delId) {
       state.activeProfile = null;
       state.channels = []; state.groups = []; state.epg = null;
-      state.vod = []; state.vodLoaded = false;
-      state.series = []; state.seriesLoaded = false;
+      state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
+      state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
+      state.openSeries = null;
       renderGroups(); renderChannels();
       $('active-source').textContent = 'Sin fuente';
     }
@@ -239,6 +291,9 @@ async function loadProfile(id) {
     state.lastProfileId = id;
     await saveProfiles();
     state.groupFilter = null; state.search = '';
+    state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
+    state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
+    state.openSeries = null;
     $('active-source').textContent = 'Fuente: ' + p.name;
     renderGroups(); renderChannels();
     toast(`Listo: ${state.channels.length} canales`);

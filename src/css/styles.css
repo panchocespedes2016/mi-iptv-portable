@@ -44,6 +44,8 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 .ep-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .ep { text-align: left; }
 #ser-back { margin-bottom: 8px; }
+.catbar { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 6px; }
+.catbar .grp { flex-shrink: 0; white-space: nowrap; }
 .ch { background: var(--panel); border-radius: 10px; padding: 10px; display: flex; gap: 10px;
   align-items: center; cursor: pointer; }
 .ch:hover { background: var(--panel2); }
