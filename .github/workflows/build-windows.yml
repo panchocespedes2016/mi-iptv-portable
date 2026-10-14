@@ -5,11 +5,22 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Subir version (patch +1)
+        id: bump
+        shell: pwsh
+        run: |
+          $v = python scripts/bump_version.py
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Nueva version: $v"
 
       - uses: actions/setup-node@v4
         with:
@@ -29,15 +40,27 @@ jobs:
           projectPath: src-tauri
           args: --no-bundle
 
-      - name: Empaquetar zip portable
+      - name: Exe y zip con numero de version
         shell: pwsh
         run: |
+          $v = "${{ steps.bump.outputs.version }}"
           $exe = Get-ChildItem src-tauri/target/release/mi-iptv-portable.exe | Select-Object -First 1
           if (-not $exe) { throw "No se encontró el .exe compilado" }
-          Compress-Archive -Path $exe.FullName -DestinationPath MiIPTV-Portable-win64.zip -Force
-          Get-ChildItem MiIPTV-Portable-win64.zip
+          $named = "mi-iptv-portable-$v.exe"
+          Rename-Item $exe.FullName $named
+          Compress-Archive -Path "src-tauri/target/release/$named" -DestinationPath "MiIPTV-Portable-$v-win64.zip" -Force
+          Get-ChildItem "MiIPTV-Portable-$v-win64.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MiIPTV-Portable-win64
-          path: MiIPTV-Portable-win64.zip
+          name: MiIPTV-Portable-${{ steps.bump.outputs.version }}-win64
+          path: MiIPTV-Portable-${{ steps.bump.outputs.version }}-win64.zip
+
+      - name: Guardar bump de version [skip ci]
+        shell: pwsh
+        run: |
+          git config user.name "CI"
+          git config user.email "ci@local"
+          git add src-tauri/tauri.conf.json src-tauri/Cargo.toml package.json package-lock.json
+          git commit -m "build: version ${{ steps.bump.outputs.version }} [skip ci]"
+          git push

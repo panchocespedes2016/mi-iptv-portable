@@ -405,6 +405,14 @@ document.addEventListener('keydown', e => {
 
 // ----------------------------------------------------------------- arranque
 (async () => {
+  // versión real del exe (Tauri) en la barra lateral
+  try {
+    if (isTauri && window.__TAURI__.app?.getVersion) {
+      const v = await window.__TAURI__.app.getVersion();
+      const el = document.querySelector('.version');
+      if (el && v) el.textContent = 'v' + v;
+    }
+  } catch {}
   const cfg = await store.get('config.json', { profiles: [] });
   state.profiles = cfg.profiles || [];
   // no restaurar localText enormes en memoria innecesariamente: ya vienen en el perfil
