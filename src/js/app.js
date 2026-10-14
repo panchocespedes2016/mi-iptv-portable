@@ -13,6 +13,8 @@ const state = {
   favorites: new Set(),
   groupFilter: null,
   search: '',
+  lastProfileId: null,
+  settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
   vod: [], vodLoaded: false, vodSearch: '',
   series: [], seriesLoaded: false, seriesSearch: '',
   openSeries: null, // {info} serie abierta
@@ -152,7 +154,11 @@ function profileForm(type) {
 
 async function saveProfiles() {
   // No guardar la contraseña en claro en el JSON si hay backend: fase 2 la cifra con DPAPI.
-  await store.set('config.json', { profiles: state.profiles });
+  await store.set('config.json', {
+    profiles: state.profiles,
+    lastProfile: state.lastProfileId || null,
+    settings: state.settings,
+  });
 }
 
 function renderProfiles() {
@@ -167,7 +173,17 @@ function renderProfiles() {
     </div>`).join('') || '<p class="hint">Sin perfiles. Agrega tu fuente Xtream o tu lista m3u.</p>';
   box.querySelectorAll('[data-load]').forEach(b => b.onclick = () => loadProfile(b.dataset.load));
   box.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
-    state.profiles = state.profiles.filter(p => p.id !== b.dataset.del);
+    const delId = b.dataset.del;
+    state.profiles = state.profiles.filter(p => p.id !== delId);
+    if (state.lastProfileId === delId) state.lastProfileId = null;
+    if (state.activeProfile?.id === delId) {
+      state.activeProfile = null;
+      state.channels = []; state.groups = []; state.epg = null;
+      state.vod = []; state.vodLoaded = false;
+      state.series = []; state.seriesLoaded = false;
+      renderGroups(); renderChannels();
+      $('active-source').textContent = 'Sin fuente';
+    }
     await saveProfiles(); renderProfiles();
   });
   $('pf-type').onchange = e => { $('pf-fields').innerHTML = profileForm(e.target.value); wireProfileSave(e.target.value); };
@@ -206,6 +222,8 @@ async function loadProfile(id) {
     if (p.type === 'm3u') await loadM3U(p);
     else await loadXtream(p);
     state.activeProfile = p;
+    state.lastProfileId = id;
+    await saveProfiles();
     state.groupFilter = null; state.search = '';
     $('active-source').textContent = 'Fuente: ' + p.name;
     renderGroups(); renderChannels();
@@ -375,14 +393,52 @@ function playChannel(id) {
   playStream(url, ch.name);
 }
 
+function fmtDelay(s) {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  const p = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
+}
+
+/** Config de hls.js con timeshift en RAM según Ajustes. */
+function hlsConfig() {
+  const s = (state.settings.timeshiftMinutes || 0) * 60;
+  const cfg = { maxBufferLength: 30 };
+  if (s > 0) {
+    cfg.backBufferLength = s;                       // ventana de timeshift (lo ya visto)
+    cfg.maxMaxBufferLength = Math.max(600, s);       // techo del buffer
+    cfg.maxBufferSize = Math.max(60 * 1024 * 1024, s * 2 * 1024 * 1024); // ~16 Mbps
+  }
+  return cfg;
+}
+
+/** Insignia "-MM:SS del en vivo" + botón ● EN VIVO (solo HLS en vivo). */
+function updateTsUi() {
+  const badge = $('ts-delay'), btn = $('btn-live');
+  let delay = 0;
+  if (hls && hls.liveSyncPosition != null && isFinite(hls.liveSyncPosition)) {
+    delay = hls.liveSyncPosition - video.currentTime;
+  }
+  if (delay > 8) {
+    badge.textContent = `-${fmtDelay(delay)} del en vivo`;
+    badge.classList.remove('hidden');
+    btn.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+    btn.classList.add('hidden');
+  }
+}
+
 function playStream(url, title = '') {
   stopPlayer();
   $('now-playing').textContent = title;
   modal.dataset.url = url;
   modal.classList.remove('hidden');
+  updateTsUi();
   if (/\.m3u8($|\?)/.test(url) && window.Hls?.isSupported()) {
-    hls = new window.Hls({ maxBufferLength: 30 });
+    hls = new window.Hls(hlsConfig());
     hls.loadSource(url); hls.attachMedia(video);
+    hls.on(window.Hls.Events.MANIFEST_PARSED, updateTsUi);
   } else if (window.mpegts?.isSupported()) {
     tsPlayer = window.mpegts.createPlayer({ type: 'mse', isLive: true, url });
     tsPlayer.attachMediaElement(video); tsPlayer.load();
@@ -391,6 +447,13 @@ function playStream(url, title = '') {
   }
   video.play().catch(() => {});
 }
+
+video.addEventListener('timeupdate', updateTsUi);
+$('btn-live').onclick = () => {
+  if (hls && hls.liveSyncPosition != null && isFinite(hls.liveSyncPosition)) {
+    video.currentTime = hls.liveSyncPosition;
+  }
+};
 
 $('btn-close').onclick = () => { stopPlayer(); modal.classList.add('hidden'); };
 $('btn-vlc').onclick = async () => {
@@ -415,9 +478,25 @@ document.addEventListener('keydown', e => {
   } catch {}
   const cfg = await store.get('config.json', { profiles: [] });
   state.profiles = cfg.profiles || [];
+  state.lastProfileId = cfg.lastProfile || null;
+  state.settings = { timeshiftMinutes: 30, ...(cfg.settings || {}) };
+  const tsSel = $('ts-minutes');
+  if (tsSel) {
+    tsSel.value = String(state.settings.timeshiftMinutes);
+    tsSel.onchange = async e => {
+      state.settings.timeshiftMinutes = parseInt(e.target.value, 10) || 0;
+      await saveProfiles();
+      toast(state.settings.timeshiftMinutes
+        ? `Timeshift: ${state.settings.timeshiftMinutes} min en RAM (aplica al próximo canal)`
+        : 'Timeshift desactivado');
+    };
+  }
   // no restaurar localText enormes en memoria innecesariamente: ya vienen en el perfil
   state.favorites = new Set(await store.get('favoritos.json', []));
   renderProfiles(); renderChannels();
+  if (state.lastProfileId && state.profiles.some(p => p.id === state.lastProfileId)) {
+    loadProfile(state.lastProfileId).catch(e => console.warn('autocarga:', e.message));
+  }
   if (isTauri) {
     try { $('datadir').textContent = 'Carpeta de datos: ' + await tauriInvoke('data_dir_path'); }
     catch {}

@@ -53,6 +53,15 @@
         <option value="m3u">Lista m3u</option>
       </select>
       <div id="pf-fields"></div>
+      <h3>Timeshift en RAM</h3>
+      <p class="hint">Pausa y retrocede la TV en vivo. El buffer vive solo en memoria RAM, no graba nada al disco. Aplica al próximo canal que abras.</p>
+      <select id="ts-minutes">
+        <option value="0">Desactivado</option>
+        <option value="15">15 minutos</option>
+        <option value="30">30 minutos</option>
+        <option value="60">60 minutos</option>
+        <option value="120">120 minutos</option>
+      </select>
       <p class="hint" id="datadir"></p>
     </section>
   </main>
@@ -61,6 +70,8 @@
   <video id="video" controls playsinline></video>
   <div class="player-bar">
     <span id="now-playing"></span>
+    <span id="ts-delay" class="hidden"></span>
+    <button id="btn-live" class="hidden live-btn">● EN VIVO</button>
     <button id="btn-vlc">Abrir en VLC</button>
     <button id="btn-close">✕ Cerrar</button>
   </div>

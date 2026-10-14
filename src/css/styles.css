@@ -80,6 +80,10 @@ button.danger { color: #ff6b6b; }
 #video { flex: 1; width: 100%; background: #000; min-height: 0; }
 .player-bar { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: var(--panel); }
 #now-playing { flex: 1; color: var(--muted); }
+.hidden { display: none !important; }
+#ts-delay { background: #4a3500; color: #ffd166; padding: 6px 10px; border-radius: 6px;
+  font-size: .85rem; white-space: nowrap; }
+.live-btn { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
 
 /* Toast */
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
