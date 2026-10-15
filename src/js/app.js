@@ -19,6 +19,7 @@ const state = {
   settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
   // subs se completa en el arranque con DEF_SUBS
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
+  vodDeep: null, // búsqueda global de películas con su etiqueta de subdivisión
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
   seriesDeep: null, // búsqueda global: todas las subdivisiones con su etiqueta
   openSeries: null, // {info} serie abierta
@@ -101,20 +102,61 @@ function renderVodCats() {
   box.querySelectorAll('[data-vc]').forEach(b => b.onclick = () => {
     state.vodCat = b.dataset.vc || null;
     state.vodLoaded = false;
+    state.vodDeep = null;
     renderMovies();
   });
 }
 
 function renderMoviesGrid() {
-  const q = state.vodSearch.toLowerCase();
-  const list = state.vod.filter(v => !q || v.name.toLowerCase().includes(q)).slice(0, 300);
-  $('movies-list').innerHTML = list.map(v => `
+  return renderMoviesGridAsync().catch(e => console.warn('películas:', e.message));
+}
+
+/** Búsqueda global de películas: todas las subdivisiones en paralelo,
+ *  etiquetando cada una, para mostrar todas las repeticiones. */
+let vodDeepPromise = null;
+function deepVodSearch() {
+  if (state.vodDeep) return Promise.resolve(state.vodDeep);
+  if (!vodDeepPromise) {
+    vodDeepPromise = (async () => {
+      const p = state.activeProfile;
+      if (!state.vodCats.length) {
+        try { state.vodCats = await p._xt.vodCategories(); } catch {}
+      }
+      toast('Buscando en todas las subdivisiones…');
+      const res = await Promise.allSettled(state.vodCats.map(c =>
+        p._xt.vodStreams(c.category_id).then(list => ({ name: c.category_name, list }))));
+      const merged = [];
+      for (const r of res) {
+        if (r.status !== 'fulfilled') continue;
+        const items = Array.isArray(r.value.list) ? r.value.list : [];
+        for (const v of items) merged.push({ ...v, _cat: r.value.name });
+      }
+      state.vodDeep = merged;
+      vodDeepPromise = null;
+      return merged;
+    })().catch(e => { vodDeepPromise = null; throw e; });
+  }
+  return vodDeepPromise;
+}
+
+async function renderMoviesGridAsync() {
+  const q = state.vodSearch.trim().toLowerCase();
+  let list, deep = false;
+  if (q) {
+    try { list = await deepVodSearch(); deep = true; }
+    catch (e) { console.warn('búsqueda global:', e.message); list = state.vod; }
+    list = list.filter(v => (v.name || '').toLowerCase().includes(q));
+  } else {
+    list = state.vod;
+  }
+  const shown = list.slice(0, 300);
+  $('movies-list').innerHTML = shown.map(v => `
     <div class="ch vod" data-vod="${v.stream_id}">
       ${v.stream_icon ? `<img src="${esc(v.stream_icon)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">🎬</div>'}
-      <div class="ch-info"><b>${esc(v.name)}</b><small>${esc(v.container_extension || '')} ${v.rating ? '★' + v.rating : ''}</small></div>
-    </div>`).join('') || '<p class="hint">Sin películas en este grupo.</p>';
+      <div class="ch-info"><b>${esc(v.name)}</b><small>${esc(v.container_extension || '')} ${v.rating ? '★' + v.rating : ''}</small>${deep && v._cat ? `<small class="cat">📁 ${esc(v._cat)}</small>` : ''}</div>
+    </div>`).join('') || '<p class="hint">Sin resultados.</p>';
   $('movies-list').querySelectorAll('[data-vod]').forEach(el => el.onclick = () => {
-    const v = state.vod.find(x => String(x.stream_id) === el.dataset.vod);
+    const v = shown.find(x => String(x.stream_id) === el.dataset.vod);
     if (v) showMovieDetail(v);
   });
 }
@@ -378,7 +420,7 @@ function renderProfiles() {
     if (state.activeProfile?.id === delId) {
       state.activeProfile = null;
       state.channels = []; state.groups = []; state.epg = null;
-      state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
+      state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null; state.vodDeep = null;
       state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null; state.seriesDeep = null;
       state.openSeries = null; state.openMovie = null;
       closePreview();
@@ -426,7 +468,7 @@ async function loadProfile(id) {
     state.lastProfileId = id;
     await saveProfiles();
     state.groupFilter = null; state.search = '';
-    state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
+    state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null; state.vodDeep = null;
     state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null; state.seriesDeep = null;
     state.openSeries = null; state.openMovie = null;
     closePreview();
