@@ -491,43 +491,102 @@ $('series-search')?.addEventListener('input', e => {
 });
 
 // ------------------------------------------------------------------ guía EPG
+const EPG_PX_MIN = 6;   // 6px por minuto → 180px cada 30 min
+const EPG_CH_W = 180;   // ancho de la columna de canal
+
 function renderGuide() {
   const box = $('epg-grid');
   if (!state.epg || !state.channels.length) {
     box.innerHTML = '<p class="hint">Carga un perfil con EPG para ver la guía.</p>';
     return;
   }
-  const now = Date.now(), from = now - 3600000, to = now + 3 * 3600000;
+  const now = Date.now();
+  const wStart = Math.floor((now - 30 * 60000) / 1800000) * 1800000;
+  const wEnd = wStart + 4 * 3600000;
+  const X = t => Math.round((t - wStart) / 60000 * EPG_PX_MIN);
+  const trackW = X(wEnd);
+  const nowX = X(now);
+
+  let slots = '';
+  for (let t = wStart; t < wEnd; t += 1800000) {
+    slots += `<span class="epg-slot" style="left:${X(t)}px">${new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+  }
+
   const chans = state.channels.filter(c => state.epg.channels.has(channelEpgId(c))).slice(0, 60);
   state.epgShown = [];
-  box.innerHTML = chans.map(c => {
-    const progs = programsFor(state.epg.programs, channelEpgId(c), from, to);
-    const items = progs.map(p => {
+  const rows = chans.map(c => {
+    const progs = programsFor(state.epg.programs, channelEpgId(c), wStart, wEnd);
+    const blocks = progs.map(p => {
+      const l = Math.max(0, X(p.start)), r = Math.min(trackW, X(p.stop));
+      if (r - l < 10) return '';
       const i = state.epgShown.length;
       state.epgShown.push({ ...p, channelName: c.name });
       const live = p.start <= now && p.stop > now;
-      const t = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `<button class="epg-p ${live ? 'live' : ''}" data-epg="${i}">${t} ${esc(p.title)}</button>`;
+      const t1 = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const t2 = new Date(p.stop).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `<button class="epg-blk ${live ? 'live' : ''}" style="left:${l}px;width:${r - l}px" data-epg="${i}">
+        <b>${esc(p.title)}</b><small>${t1} - ${t2}</small></button>`;
     }).join('');
-    return `<div class="epg-row">
-      <div class="epg-ch">${c.logo ? `<img src="${esc(c.logo)}" onerror="this.remove()">` : ''}<b>${esc(c.name)}</b></div>
-      <div class="epg-progs">${items || '<span class="hint">sin datos</span>'}</div>
+    return `<div class="epg-tl-row">
+      <div class="epg-tl-ch" style="width:${EPG_CH_W}px">${c.logo ? `<img src="${esc(c.logo)}" onerror="this.remove()">` : ''}<b>${esc(c.name)}</b></div>
+      <div class="epg-tl-track" style="width:${trackW}px">${blocks || '<span class="hint">sin datos</span>'}</div>
     </div>`;
   }).join('');
-  box.querySelectorAll('[data-epg]').forEach(b => b.onclick = () => showProgramDetail(state.epgShown[+b.dataset.epg]));
+
+  box.innerHTML = `
+    <div id="epg-detail" class="epg-detail hidden"></div>
+    <div class="epg-tl">
+      <div class="epg-tl-head">
+        <div class="epg-tl-corner" style="width:${EPG_CH_W}px"></div>
+        <div class="epg-tl-slots" style="width:${trackW}px">${slots}<span class="epg-now-tag" style="left:${nowX}px">AHORA</span></div>
+      </div>
+      <div class="epg-tl-body">${rows}<div class="epg-now-line" style="left:calc(${EPG_CH_W}px + ${nowX}px)"></div></div>
+    </div>`;
+
+  box.querySelectorAll('[data-epg]').forEach(b =>
+    b.onclick = () => showEpgDetail(state.epgShown[+b.dataset.epg], b));
+
+  const tl = box.querySelector('.epg-tl');
+  if (tl) tl.scrollLeft = Math.max(0, nowX - 200);
+  const firstLive = box.querySelector('.epg-blk.live');
+  if (firstLive) showEpgDetail(state.epgShown[+firstLive.dataset.epg], firstLive);
 }
 
-/** Ficha del programa de la guía: título, canal, horario y descripción completa. */
-function showProgramDetail(p) {
+/** Ficha del programa seleccionado: título, canal, horario, progreso y descripción. */
+function showEpgDetail(p, el) {
   if (!p) return;
-  $('info-title').textContent = p.title || 'Sin título';
-  const d = new Date(p.start).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  document.querySelectorAll('.epg-blk.sel').forEach(x => x.classList.remove('sel'));
+  el?.classList.add('sel');
+  const now = Date.now();
   const t1 = new Date(p.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const t2 = new Date(p.stop).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  $('info-meta').textContent = `${p.channelName} · ${d} · ${t1} – ${t2}`;
-  $('info-desc').textContent = p.desc || 'Sin descripción.';
-  $('info-modal').classList.remove('hidden');
+  const left = Math.max(0, Math.round((p.stop - now) / 60000));
+  const pct = Math.min(100, Math.max(0, (now - p.start) / Math.max(1, p.stop - p.start) * 100));
+  const d = $('epg-detail');
+  d.classList.remove('hidden');
+  d.innerHTML = `
+    <div class="epg-d-top"><h3>${esc(p.title || 'Sin título')}</h3><span class="meta">${esc(p.channelName || '')}</span></div>
+    <div class="meta">${t1} - ${t2} · ${left} min restantes</div>
+    <div class="epg-d-progress"><div style="width:${pct}%"></div></div>
+    <p>${esc(p.desc || 'Sin descripción.')}</p>`;
 }
+
+// Refresca la guía cada minuto si está visible (línea AHORA y progreso al día)
+setInterval(() => {
+  const v = $('view-guide');
+  if (!v || !v.classList.contains('active') || !state.epg) return;
+  const tl = v.querySelector('.epg-tl');
+  const sl = tl ? tl.scrollLeft : 0;
+  const sel = document.querySelector('.epg-blk.sel');
+  const selIdx = sel ? sel.dataset.epg : null;
+  renderGuide();
+  const tl2 = v.querySelector('.epg-tl');
+  if (tl2) tl2.scrollLeft = sl;
+  if (selIdx != null) {
+    const b = v.querySelector(`[data-epg="${selIdx}"]`);
+    if (b) showEpgDetail(state.epgShown[+selIdx], b);
+  }
+}, 60000);
 
 // ---------------------------------------------------------------- favoritos
 function renderFavs() {
