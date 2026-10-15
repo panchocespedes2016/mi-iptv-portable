@@ -61,6 +61,6 @@ jobs:
         run: |
           git config user.name "CI"
           git config user.email "ci@local"
-          git add src-tauri/tauri.conf.json src-tauri/Cargo.toml package.json package-lock.json
+          git add src-tauri/tauri.conf.json src-tauri/Cargo.toml package.json package-lock.json src/version.json
           git commit -m "build: version ${{ steps.bump.outputs.version }} [skip ci]"
           git push

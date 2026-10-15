@@ -38,6 +38,12 @@ def main():
             json.dump(d, f, indent=2)
             f.write('\n')
 
+    # version visible en la app (la lee el frontend con fetch, sin depender
+    # de APIs del runtime de Tauri)
+    with open('src/version.json', 'w', encoding='utf-8') as f:
+        json.dump({'version': nv}, f)
+        f.write('\n')
+
     print(nv)
 
 

@@ -1146,12 +1146,13 @@ $('info-modal').addEventListener('click', e => {
 
 // ----------------------------------------------------------------- arranque
 (async () => {
-  // versión real del exe (Tauri) en la barra lateral
+  // versión del exe en la barra lateral (la escribe el CI en src/version.json)
   try {
-    if (isTauri && window.__TAURI__.app?.getVersion) {
-      const v = await window.__TAURI__.app.getVersion();
+    const r = await fetch('version.json');
+    if (r.ok) {
+      const j = await r.json();
       const el = document.querySelector('.version');
-      if (el && v) el.textContent = 'v' + v;
+      if (el && j.version) el.textContent = 'v' + j.version;
     }
   } catch {}
   const cfg = await store.get('config.json', { profiles: [] });
