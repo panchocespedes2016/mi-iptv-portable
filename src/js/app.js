@@ -198,10 +198,9 @@ function detailMeta(info) {
 function renderMovieDetail() {
   const { item, info } = state.openMovie;
   const p = state.activeProfile;
-  $('vod-cats').innerHTML = '';
   const poster = info.movie_image || item.stream_icon || '';
   const meta = detailMeta(info);
-  $('movies-list').innerHTML = `
+  $('movie-detail').innerHTML = `
     <button id="detail-back">← Volver</button>
     <div class="detail">
       ${poster ? `<img class="detail-poster" src="${esc(poster)}" onerror="this.remove()">` : ''}
@@ -214,11 +213,19 @@ function renderMovieDetail() {
         <button id="detail-play" class="play-btn">▶ Reproducir</button>
       </div>
     </div>`;
-  $('detail-back').onclick = () => { state.openMovie = null; renderMovies(); };
+  showMovieView(true);
+  $('detail-back').onclick = () => { state.openMovie = null; showMovieView(false); renderMovies(); };
   $('detail-play').onclick = () => {
     const ext = info.container_extension || item.container_extension || 'mp4';
     playStream(p._xt.movieUrl(item.stream_id, ext), info.name || item.name);
   };
+}
+
+/** Alterna entre la cuadrícula y la ficha de película. */
+function showMovieView(detail) {
+  $('movies-list').classList.toggle('hidden', detail);
+  $('vod-cats').classList.toggle('hidden', detail);
+  $('movie-detail').classList.toggle('hidden', !detail);
 }
 
 // ---------------------------------------------------------- ficha de serie
@@ -238,7 +245,6 @@ function renderSeriesDetail() {
   const p = state.activeProfile;
   const seasons = seasonsOf(info);
   const allEps = seasons.flatMap(([, eps]) => eps);
-  $('series-cats').innerHTML = '';
   const meta = detailMeta(det);
   let html = `
     <button id="detail-back">← Volver</button>
@@ -257,14 +263,22 @@ function renderSeriesDetail() {
     ).join('') + `</div>`;
   }
   if (!allEps.length) html += '<p class="hint">Esta serie no trae episodios en el proveedor.</p>';
-  $('series-list').innerHTML = html;
-  $('detail-back').onclick = () => { state.openSeries = null; renderSeriesList(); };
-  $('series-list').querySelectorAll('[data-ep]').forEach(b => b.onclick = () => {
+  $('series-detail').innerHTML = html;
+  showSeriesView(true);
+  $('detail-back').onclick = () => { state.openSeries = null; showSeriesView(false); renderSeriesList(); };
+  $('series-detail').querySelectorAll('[data-ep]').forEach(b => b.onclick = () => {
     const ep = allEps.find(x => String(x.id) === b.dataset.ep);
     if (!ep) return toast('Episodio no disponible');
     playStream(p._xt.episodeUrl(ep.id, ep.container_extension || 'mp4'),
       `${det.name || ''} E${ep.episode_num || ''}`);
   });
+}
+
+/** Alterna entre la cuadrícula y la ficha de serie. */
+function showSeriesView(detail) {
+  $('series-list').classList.toggle('hidden', detail);
+  $('series-cats').classList.toggle('hidden', detail);
+  $('series-detail').classList.toggle('hidden', !detail);
 }
 
 // -------------------------------------------------------- perfiles (ajustes)
