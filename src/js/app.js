@@ -628,7 +628,53 @@ function playChannel(id) {
   if (!url) return toast('Sin URL de stream');
   playStream(url, ch.name);
   state.playingCh = ch;
+  updatePlayerFavBtn();
 }
+
+/** Estrella de favorito del canal actual (solo TV en vivo). */
+function updatePlayerFavBtn() {
+  const b = $('btn-fav');
+  const ch = state.playingCh;
+  b.style.display = ch ? '' : 'none';
+  b.textContent = (ch && state.favorites.has(ch.id)) ? '★' : '☆';
+}
+
+$('btn-fav').onclick = async () => {
+  const ch = state.playingCh;
+  if (!ch) return;
+  state.favorites.has(ch.id) ? state.favorites.delete(ch.id) : state.favorites.add(ch.id);
+  await store.set('favoritos.json', [...state.favorites]);
+  updatePlayerFavBtn();
+  renderChannels();
+};
+
+/** Lista rápida de canales sin salir del reproductor. */
+function renderPlayerChList(q = '') {
+  const box = $('ch-list-items');
+  const query = q.toLowerCase();
+  const now = Date.now();
+  const list = state.channels.filter(c => !query || c.name.toLowerCase().includes(query)).slice(0, 200);
+  box.innerHTML = list.map(c => {
+    const prog = state.epg ? nowPlaying(state.epg.programs, channelEpgId(c), now) : null;
+    return `<button class="ch-row ${state.playingCh?.id === c.id ? 'cur' : ''}" data-id="${esc(c.id)}">
+      ${c.logo ? `<img src="${esc(c.logo)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
+      <div class="ch-info"><b>${esc(c.name)}</b><small>${esc(prog ? prog.title : c.group)}</small></div>
+    </button>`;
+  }).join('') || '<p class="hint">Sin canales.</p>';
+  box.querySelectorAll('[data-id]').forEach(b => b.onclick = () => {
+    $('ch-list').classList.add('hidden');
+    playChannel(b.dataset.id);
+  });
+}
+
+$('btn-chlist').onclick = () => {
+  const p = $('ch-list');
+  if (p.classList.contains('hidden')) {
+    renderPlayerChList($('ch-list-search').value || '');
+    p.classList.remove('hidden');
+  } else p.classList.add('hidden');
+};
+$('ch-list-search').addEventListener('input', e => renderPlayerChList(e.target.value));
 
 function fmtDelay(s) {
   s = Math.max(0, Math.round(s));
@@ -670,7 +716,9 @@ function playStream(url, title = '') {
   stopPlayer();
   stopPreview();
   hideOsd();
+  $('ch-list').classList.add('hidden');
   state.playingCh = null;
+  updatePlayerFavBtn();
   $('now-playing').textContent = title;
   modal.dataset.url = url;
   modal.classList.remove('hidden');
@@ -834,6 +882,7 @@ $('pv-close').onclick = closePreview;
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('info-modal').classList.contains('hidden')) $('info-modal').classList.add('hidden');
+  else if (!$('ch-list').classList.contains('hidden')) $('ch-list').classList.add('hidden');
   else if (!modal.classList.contains('hidden')) $('btn-close').click();
 });
 $('info-close').onclick = () => $('info-modal').classList.add('hidden');

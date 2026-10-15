@@ -103,9 +103,15 @@
     <span id="now-playing"></span>
     <span id="ts-delay" class="hidden"></span>
     <button id="btn-live" class="hidden live-btn">● EN VIVO</button>
+    <button id="btn-chlist" title="Lista de canales">☰</button>
+    <button id="btn-fav" class="fav" title="Favorito">☆</button>
     <button id="btn-vlc">Abrir en VLC</button>
     <button id="btn-close">✕ Cerrar</button>
   </div>
+  <aside id="ch-list" class="hidden">
+    <input id="ch-list-search" placeholder="🔍 Buscar canal…">
+    <div id="ch-list-items"></div>
+  </aside>
 </div>
 <div id="toast"></div>
 <div id="info-modal" class="hidden">

@@ -126,6 +126,23 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
   .live-cols { flex-direction: column; }
   #live-preview { width: 100%; position: static; }
 }
+/* Lista rápida de canales dentro del reproductor */
+#ch-list { position: absolute; top: 0; bottom: 0; left: 0; width: 340px; max-width: 85%;
+  background: rgba(17,24,32,.97); z-index: 8; display: flex; flex-direction: column;
+  border-right: 1px solid #2c3947; }
+#ch-list.hidden { display: none; }
+#ch-list-search { margin: 12px 12px 8px; background: var(--panel); border: 1px solid #2c3947;
+  color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: .95rem; }
+#ch-list-items { overflow-y: auto; flex: 1; padding: 0 12px 12px; display: flex;
+  flex-direction: column; gap: 4px; }
+.ch-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px;
+  cursor: pointer; background: none; border: none; color: var(--text); text-align: left;
+  font-family: inherit; width: 100%; font-size: 1rem; }
+.ch-row:hover { background: var(--panel2); }
+.ch-row.cur { outline: 2px solid var(--accent); }
+.ch-row img { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.ch-row .no-logo { width: 36px; height: 36px; font-size: 1.2rem; }
+.ch-row .ch-info { flex: 1; min-width: 0; }
 /* OSD: info que aparece al tocar el video en pantalla completa */
 #osd { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 #osd.hidden { display: none; }
