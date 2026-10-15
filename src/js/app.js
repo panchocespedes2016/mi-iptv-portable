@@ -837,6 +837,7 @@ let osdTimer = null;
 
 function hideOsd() {
   clearTimeout(osdTimer);
+  stopOsdStats();
   $('osd').classList.add('hidden');
 }
 
@@ -848,12 +849,11 @@ function fillOsd() {
     nowD.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   const ch = state.playingCh;
   $('osd-title').textContent = ch ? ch.name : ($('now-playing').textContent || '');
-  const res = video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : '';
   const prog = (ch && state.epg) ? nowPlaying(state.epg.programs, channelEpgId(ch), t) : null;
   if (prog) {
     const left = Math.max(0, Math.round((prog.stop - t) / 60000));
     $('osd-prog').textContent =
-      `${prog.title} · ${hhmm(prog.start)} - ${hhmm(prog.stop)} · ${left} min restantes${res ? ' · ' + res : ''}`;
+      `${prog.title} · ${hhmm(prog.start)} - ${hhmm(prog.stop)} · ${left} min restantes`;
     $('osd-bar').style.width = Math.min(100, Math.max(0,
       (t - prog.start) / Math.max(1, prog.stop - prog.start) * 100)) + '%';
     $('osd-desc').textContent = prog.desc || '';
@@ -861,11 +861,46 @@ function fillOsd() {
       .filter(p => p.start >= t).slice(0, 1)[0];
     $('osd-next').textContent = next ? `Siguiente ${hhmm(next.start)}: ${next.title}` : '';
   } else {
-    $('osd-prog').textContent = res;
+    $('osd-prog').textContent = '';
     $('osd-bar').style.width = '0%';
     $('osd-desc').textContent = '';
     $('osd-next').textContent = '';
   }
+}
+
+/* Stats del stream: resolución, fps (medidos) y códecs — se refrescan mientras el OSD está visible. */
+let osdStatsTimer = null, osdLastFrames = 0, osdLastT = 0;
+
+function osdStatsText() {
+  const parts = [];
+  if (video.videoWidth) parts.push(`${video.videoWidth}×${video.videoHeight}`);
+  const q = video.getVideoPlaybackQuality?.();
+  if (q) {
+    const now = performance.now();
+    if (osdLastT) {
+      const fps = (q.totalVideoFrames - osdLastFrames) / ((now - osdLastT) / 1000);
+      if (isFinite(fps) && fps > 0) parts.push(`${Math.round(fps)} fps`);
+    }
+    osdLastFrames = q.totalVideoFrames; osdLastT = now;
+  }
+  const lvl = hls?.levels?.[hls.currentLevel];
+  if (lvl?.videoCodec) parts.push(lvl.videoCodec);
+  if (lvl?.audioCodec) parts.push(lvl.audioCodec);
+  return parts.join(' · ');
+}
+
+function startOsdStats() {
+  stopOsdStats();
+  const tick = () => {
+    if ($('osd').classList.contains('hidden')) return stopOsdStats();
+    $('osd-stats').textContent = osdStatsText();
+  };
+  tick();
+  osdStatsTimer = setInterval(tick, 1000);
+}
+
+function stopOsdStats() {
+  clearInterval(osdStatsTimer); osdStatsTimer = null; osdLastT = 0;
 }
 
 /** Tocar el video muestra/oculta la info; se oculta sola a los 6 segundos. */
@@ -874,6 +909,7 @@ video.addEventListener('click', () => {
   if (osd.classList.contains('hidden')) {
     fillOsd();
     osd.classList.remove('hidden');
+    startOsdStats();
     clearTimeout(osdTimer);
     osdTimer = setTimeout(hideOsd, 6000);
   } else hideOsd();
