@@ -102,6 +102,29 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 .epg-blk.sel { outline: 2px solid var(--accent); }
 .epg-now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ff5252;
   z-index: 4; pointer-events: none; }
+/* Multivista 2x2 */
+#multi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mv-tile { position: relative; aspect-ratio: 16/9; background: #000; border-radius: 10px;
+  overflow: hidden; cursor: pointer; border: 2px solid transparent; }
+.mv-tile.focused { border-color: var(--accent); }
+.mv-tile video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.mv-add { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%;
+  font-size: 2rem; line-height: 1; background: rgba(255,255,255,.92); color: #111; border: none; cursor: pointer; }
+.mv-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center;
+  gap: 8px; padding: 8px 12px; background: linear-gradient(transparent, rgba(0,0,0,.8)); }
+.mv-label { flex: 1; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-x { background: rgba(0,0,0,.5); border: none; color: #fff; border-radius: 6px;
+  padding: 4px 9px; cursor: pointer; font-size: .9rem; }
+#mv-picker { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 70;
+  display: flex; align-items: center; justify-content: center; }
+#mv-picker.hidden { display: none; }
+.mv-picker-card { background: var(--panel); border-radius: 12px; padding: 16px; width: 440px;
+  max-width: 92%; max-height: 80vh; display: flex; flex-direction: column; }
+#mv-picker-search { background: var(--bg); border: 1px solid #2c3947; color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font-size: .95rem; }
+#mv-picker-items { overflow-y: auto; flex: 1; display: flex; flex-direction: column;
+  gap: 4px; margin: 10px 0; min-height: 200px; }
+#mv-picker-close { margin-top: 4px; }
 /* TV en vivo: lista + vista previa */
 .live-cols { display: flex; gap: 16px; align-items: flex-start; min-height: 0; flex: 1; }
 #live-list { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }

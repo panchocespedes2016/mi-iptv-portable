@@ -17,6 +17,7 @@
       <button class="nav-btn" data-view="movies">🎬 Películas</button>
       <button class="nav-btn" data-view="series">📺 Series</button>
       <button class="nav-btn" data-view="favs">⭐ Favoritos</button>
+      <button class="nav-btn" data-view="multi">⊞ Multivista</button>
       <button class="nav-btn" data-view="settings">⚙ Ajustes</button>
     </nav>
     <div class="version">v…</div>
@@ -64,9 +65,20 @@
       <div id="series-detail" class="hidden"></div>
     </section>
     <section id="view-favs" class="view"><h2>Favoritos</h2><div id="favs-list"></div></section>
+    <section id="view-multi" class="view">
+      <h2>Multivista</h2>
+      <p class="hint">Toca <b>+</b> para elegir un canal en cada pantalla. Un toque le da el audio a esa pantalla; doble toque la abre en pantalla completa.</p>
+      <div id="multi-grid"></div>
+    </section>
+    <div id="mv-picker" class="hidden">
+      <div class="mv-picker-card">
+        <input id="mv-picker-search" placeholder="🔍 Buscar canal…">
+        <div id="mv-picker-items"></div>
+        <button id="mv-picker-close">Cerrar</button>
+      </div>
+    </div>
     <section id="view-settings" class="view">
-      <h2>Ajustes</h2>
-      <h3>Mis fuentes</h3>
+      <h2>Ajustes</h2>      <h3>Mis fuentes</h3>
       <div id="profiles"></div>
       <h3>Agregar fuente</h3>
       <select id="pf-type">

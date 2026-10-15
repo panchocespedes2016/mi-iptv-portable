@@ -60,6 +60,8 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.view === 'favs') renderFavs();
     if (btn.dataset.view === 'movies') renderMovies();
     if (btn.dataset.view === 'series') renderSeriesList();
+    if (btn.dataset.view === 'multi' && !mvSlots.length) mvBuild();
+    if (btn.dataset.view !== 'multi') mvStopAll();
   });
 });
 
@@ -384,6 +386,7 @@ async function loadProfile(id) {
     state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
     state.openSeries = null; state.openMovie = null;
     closePreview();
+    mvSlots.forEach((_, i) => mvClear(i));
     $('active-source').textContent = 'Fuente: ' + p.name;
     renderGroups(); renderChannels();
     toast(`Listo: ${state.channels.length} canales`);
@@ -716,6 +719,7 @@ function playStream(url, title = '') {
   stopPlayer();
   stopPreview();
   hideOsd();
+  mvStopAll();
   $('ch-list').classList.add('hidden');
   state.playingCh = null;
   updatePlayerFavBtn();
@@ -879,6 +883,135 @@ pvVideo.addEventListener('click', () => { if (state.previewId) playChannel(state
 $('pv-expand').onclick = () => { if (state.previewId) playChannel(state.previewId); };
 $('pv-vlc').onclick = () => openExternal(state.previewUrl);
 $('pv-close').onclick = closePreview;
+
+// ------------------------------------------------------------- multivista 2x2
+const MV_SLOTS = 4;
+const mvSlots = []; // [{id, url, hls, ts, playing, video, tile, addBtn, bar, label}]
+let mvFocus = -1;
+let mvPickSlot = -1;
+
+/** Construye las 4 pantallas (una vez). */
+function mvBuild() {
+  const grid = $('multi-grid');
+  for (let i = 0; i < MV_SLOTS; i++) {
+    const tile = document.createElement('div');
+    tile.className = 'mv-tile';
+    tile.dataset.slot = i;
+    tile.innerHTML = `
+      <video muted playsinline></video>
+      <button class="mv-add" title="Elegir canal">+</button>
+      <div class="mv-bar hidden"><span class="mv-label"></span><button class="mv-x" title="Quitar">✕</button></div>`;
+    const s = {
+      id: null, url: null, hls: null, ts: null, playing: false,
+      video: tile.querySelector('video'), tile,
+      addBtn: tile.querySelector('.mv-add'),
+      bar: tile.querySelector('.mv-bar'), label: tile.querySelector('.mv-label'),
+    };
+    s.addBtn.onclick = e => { e.stopPropagation(); mvPick(i); };
+    tile.querySelector('.mv-x').onclick = e => { e.stopPropagation(); mvClear(i); };
+    tile.onclick = () => {
+      if (!s.id) mvPick(i);
+      else if (!s.playing) mvPlay(i);
+      else mvFocusSlot(i);
+    };
+    tile.ondblclick = () => { if (s.id && s.playing) playChannel(s.id); };
+    mvSlots.push(s);
+    grid.appendChild(tile);
+  }
+}
+
+function mvUpdate(i) {
+  const s = mvSlots[i];
+  if (!s) return;
+  const ch = s.id ? state.channels.find(c => c.id === s.id) : null;
+  s.addBtn.classList.toggle('hidden', !!s.id);
+  s.bar.classList.toggle('hidden', !s.id);
+  s.label.textContent = ch ? ch.name : '';
+  s.tile.classList.toggle('focused', mvFocus === i && s.playing);
+}
+
+function mvStopStream(i) {
+  const s = mvSlots[i];
+  if (!s) return;
+  if (s.hls) { s.hls.destroy(); s.hls = null; }
+  if (s.ts) { s.ts.destroy(); s.ts = null; }
+  s.video.pause(); s.video.removeAttribute('src'); s.video.load();
+  s.playing = false;
+}
+
+/** Detiene las pantallas pero conserva qué canal tiene cada una. */
+function mvStopAll() {
+  mvSlots.forEach((s, i) => { mvStopStream(i); mvUpdate(i); });
+  mvFocus = -1;
+}
+
+function mvFocusSlot(i) {
+  mvFocus = i;
+  mvSlots.forEach((s, j) => { s.video.muted = j !== i; });
+  mvSlots.forEach((_, j) => mvUpdate(j));
+}
+
+function mvPlay(i) {
+  const s = mvSlots[i];
+  const ch = s.id ? state.channels.find(c => c.id === s.id) : null;
+  if (!ch) return;
+  const url = streamUrlFor(ch);
+  if (!url) return toast('Sin URL de stream');
+  mvStopStream(i);
+  s.url = url;
+  if (/\.m3u8($|\?)/.test(url) && window.Hls?.isSupported()) {
+    s.hls = new window.Hls({ maxBufferLength: 30 });
+    s.hls.loadSource(url); s.hls.attachMedia(s.video);
+  } else if (window.mpegts?.isSupported()) {
+    s.ts = window.mpegts.createPlayer({ type: 'mse', isLive: true, url });
+    s.ts.attachMediaElement(s.video); s.ts.load();
+  } else s.video.src = url;
+  s.playing = true;
+  s.video.muted = true;
+  s.video.play().catch(() => {});
+  if (mvFocus < 0 || !mvSlots[mvFocus]?.playing) mvFocusSlot(i);
+  else mvUpdate(i);
+}
+
+function mvClear(i) {
+  const s = mvSlots[i];
+  if (!s) return;
+  mvStopStream(i);
+  s.id = null; s.url = null;
+  if (mvFocus === i) {
+    mvFocus = -1;
+    const next = mvSlots.findIndex(x => x.playing);
+    if (next >= 0) { mvFocusSlot(next); return; }
+  }
+  mvUpdate(i);
+}
+
+/** Selector de canal para una pantalla. */
+function mvPick(i) {
+  mvPickSlot = i;
+  $('mv-picker-search').value = '';
+  mvRenderPicker('');
+  $('mv-picker').classList.remove('hidden');
+  $('mv-picker-search').focus();
+}
+
+function mvRenderPicker(q) {
+  const query = q.toLowerCase();
+  const list = state.channels.filter(c => !query || c.name.toLowerCase().includes(query)).slice(0, 200);
+  const box = $('mv-picker-items');
+  box.innerHTML = list.map(c => `
+    <button class="ch-row" data-id="${esc(c.id)}">
+      ${c.logo ? `<img src="${esc(c.logo)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
+      <div class="ch-info"><b>${esc(c.name)}</b><small>${esc(c.group)}</small></div>
+    </button>`).join('') || '<p class="hint">Sin canales. Carga un perfil en Ajustes.</p>';
+  box.querySelectorAll('[data-id]').forEach(b => b.onclick = () => {
+    const i = mvPickSlot;
+    $('mv-picker').classList.add('hidden');
+    if (i >= 0 && mvSlots[i]) { mvSlots[i].id = b.dataset.id; mvPlay(i); }
+  });
+}
+$('mv-picker-close').onclick = () => $('mv-picker').classList.add('hidden');
+$('mv-picker-search').addEventListener('input', e => mvRenderPicker(e.target.value));
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('info-modal').classList.contains('hidden')) $('info-modal').classList.add('hidden');
