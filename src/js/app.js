@@ -20,6 +20,7 @@ const state = {
   // subs se completa en el arranque con DEF_SUBS
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
+  seriesDeep: null, // búsqueda global: todas las subdivisiones con su etiqueta
   openSeries: null, // {info} serie abierta
   openMovie: null, // {item, info, data} película abierta
 };
@@ -152,21 +153,63 @@ function renderSeriesCats() {
   box.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
     state.seriesCat = b.dataset.sc || null;
     state.seriesLoaded = false;
+    state.seriesDeep = null;
     state.openSeries = null;
     renderSeriesList();
   });
 }
 
 function renderSeriesGrid() {
-  const q = state.seriesSearch.toLowerCase();
-  const list = state.series.filter(s => !q || s.name.toLowerCase().includes(q)).slice(0, 300);
-  $('series-list').innerHTML = list.map(s => `
+  return renderSeriesGridAsync().catch(e => console.warn('series:', e.message));
+}
+
+/** Búsqueda global: recorre todas las subdivisiones en paralelo y etiqueta
+ *  cada serie con su subdivisión, para mostrar todas las repeticiones. */
+let seriesDeepPromise = null;
+function deepSeriesSearch() {
+  if (state.seriesDeep) return Promise.resolve(state.seriesDeep);
+  if (!seriesDeepPromise) {
+    seriesDeepPromise = (async () => {
+      const p = state.activeProfile;
+      if (!state.seriesCats.length) {
+        try { state.seriesCats = await p._xt.seriesCategories(); } catch {}
+      }
+      toast('Buscando en todas las subdivisiones…');
+      const res = await Promise.allSettled(state.seriesCats.map(c =>
+        p._xt.series(c.category_id).then(list => ({ name: c.category_name, list }))));
+      const merged = [];
+      for (const r of res) {
+        if (r.status !== 'fulfilled') continue;
+        const items = Array.isArray(r.value.list) ? r.value.list : [];
+        for (const s of items) merged.push({ ...s, _cat: r.value.name });
+      }
+      state.seriesDeep = merged;
+      seriesDeepPromise = null;
+      return merged;
+    })().catch(e => { seriesDeepPromise = null; throw e; });
+  }
+  return seriesDeepPromise;
+}
+
+async function renderSeriesGridAsync() {
+  const q = state.seriesSearch.trim().toLowerCase();
+  let list, deep = false;
+  if (q) {
+    // con texto: búsqueda global en todas las subdivisiones
+    try { list = await deepSeriesSearch(); deep = true; }
+    catch (e) { console.warn('búsqueda global:', e.message); list = state.series; }
+    list = list.filter(s => (s.name || '').toLowerCase().includes(q));
+  } else {
+    list = state.series;
+  }
+  const shown = list.slice(0, 300);
+  $('series-list').innerHTML = shown.map(s => `
     <div class="ch vod" data-ser="${s.series_id}">
       ${s.cover ? `<img src="${esc(s.cover)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
-      <div class="ch-info"><b>${esc(s.name)}</b><small>${esc(s.genre || '')}</small></div>
-    </div>`).join('') || '<p class="hint">Sin series en este grupo.</p>';
+      <div class="ch-info"><b>${esc(s.name)}</b><small>${esc(s.genre || '')}</small>${deep && s._cat ? `<small class="cat">📁 ${esc(s._cat)}</small>` : ''}</div>
+    </div>`).join('') || '<p class="hint">Sin resultados.</p>';
   $('series-list').querySelectorAll('[data-ser]').forEach(el => el.onclick = () => {
-    const s = state.series.find(x => String(x.series_id) === el.dataset.ser);
+    const s = shown.find(x => String(x.series_id) === el.dataset.ser);
     if (s) showSeriesDetail(s);
   });
 }
@@ -336,7 +379,7 @@ function renderProfiles() {
       state.activeProfile = null;
       state.channels = []; state.groups = []; state.epg = null;
       state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
-      state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
+      state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null; state.seriesDeep = null;
       state.openSeries = null; state.openMovie = null;
       closePreview();
       renderGroups(); renderChannels();
@@ -384,7 +427,7 @@ async function loadProfile(id) {
     await saveProfiles();
     state.groupFilter = null; state.search = '';
     state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
-    state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
+    state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null; state.seriesDeep = null;
     state.openSeries = null; state.openMovie = null;
     closePreview();
     mvSlots.forEach((_, i) => mvClear(i));

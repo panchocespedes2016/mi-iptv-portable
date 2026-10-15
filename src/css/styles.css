@@ -66,6 +66,7 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 .ch-info { flex: 1; min-width: 0; }
 .ch-info b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .92rem; }
 .ch-info small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-info small.cat { color: #7fb3ff; }
 .fav { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: gold; }
 
 /* Guía EPG */
