@@ -15,6 +15,7 @@ const state = {
   search: '',
   lastProfileId: null,
   previewId: null, previewUrl: null, // canal en vista previa
+  playingCh: null, // canal sonando en el reproductor (para el OSD)
   settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
@@ -626,6 +627,7 @@ function playChannel(id) {
   const url = streamUrlFor(ch);
   if (!url) return toast('Sin URL de stream');
   playStream(url, ch.name);
+  state.playingCh = ch;
 }
 
 function fmtDelay(s) {
@@ -667,6 +669,8 @@ function updateTsUi() {
 function playStream(url, title = '') {
   stopPlayer();
   stopPreview();
+  hideOsd();
+  state.playingCh = null;
   $('now-playing').textContent = title;
   modal.dataset.url = url;
   modal.classList.remove('hidden');
@@ -691,8 +695,56 @@ $('btn-live').onclick = () => {
   }
 };
 
+// ------------------------------------------------------- OSD pantalla completa
+let osdTimer = null;
+
+function hideOsd() {
+  clearTimeout(osdTimer);
+  $('osd').classList.add('hidden');
+}
+
+/** Llena el OSD: canal, programa al aire con progreso, resolución, desc y siguiente. */
+function fillOsd() {
+  const nowD = new Date(), t = nowD.getTime();
+  $('osd-clock').textContent =
+    nowD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    nowD.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const ch = state.playingCh;
+  $('osd-title').textContent = ch ? ch.name : ($('now-playing').textContent || '');
+  const res = video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : '';
+  const prog = (ch && state.epg) ? nowPlaying(state.epg.programs, channelEpgId(ch), t) : null;
+  if (prog) {
+    const left = Math.max(0, Math.round((prog.stop - t) / 60000));
+    $('osd-prog').textContent =
+      `${prog.title} · ${hhmm(prog.start)} - ${hhmm(prog.stop)} · ${left} min restantes${res ? ' · ' + res : ''}`;
+    $('osd-bar').style.width = Math.min(100, Math.max(0,
+      (t - prog.start) / Math.max(1, prog.stop - prog.start) * 100)) + '%';
+    $('osd-desc').textContent = prog.desc || '';
+    const next = programsFor(state.epg.programs, channelEpgId(ch), t, t + 3 * 3600000)
+      .filter(p => p.start >= t).slice(0, 1)[0];
+    $('osd-next').textContent = next ? `Siguiente ${hhmm(next.start)}: ${next.title}` : '';
+  } else {
+    $('osd-prog').textContent = res;
+    $('osd-bar').style.width = '0%';
+    $('osd-desc').textContent = '';
+    $('osd-next').textContent = '';
+  }
+}
+
+/** Tocar el video muestra/oculta la info; se oculta sola a los 6 segundos. */
+video.addEventListener('click', () => {
+  const osd = $('osd');
+  if (osd.classList.contains('hidden')) {
+    fillOsd();
+    osd.classList.remove('hidden');
+    clearTimeout(osdTimer);
+    osdTimer = setTimeout(hideOsd, 6000);
+  } else hideOsd();
+});
+
 $('btn-close').onclick = () => {
   stopPlayer();
+  hideOsd();
   modal.classList.add('hidden');
   if (state.previewId) showPreview(state.previewId); // retoma la vista previa
 };

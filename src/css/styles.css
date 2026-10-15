@@ -126,6 +126,17 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
   .live-cols { flex-direction: column; }
   #live-preview { width: 100%; position: static; }
 }
+/* OSD: info que aparece al tocar el video en pantalla completa */
+#osd { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+#osd.hidden { display: none; }
+.osd-clock { position: absolute; top: 66px; right: 18px; background: rgba(0,0,0,.6);
+  padding: 6px 12px; border-radius: 8px; font-size: .9rem; }
+.osd-panel { position: absolute; top: 58px; left: 0; right: 0; padding: 18px 22px 30px;
+  background: linear-gradient(rgba(0,0,0,.82), transparent); }
+.osd-panel h3 { margin-bottom: 2px; }
+.osd-panel .meta { color: #c8d2dc; font-size: .9rem; margin: 4px 0; }
+.osd-panel p { font-size: .9rem; line-height: 1.45; color: #aeb9c4; margin: 8px 0 0;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 /* Modal de ficha (programa EPG) */
 #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex;
   align-items: center; justify-content: center; z-index: 60; }
