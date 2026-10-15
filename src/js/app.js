@@ -14,6 +14,7 @@ const state = {
   groupFilter: null,
   search: '',
   lastProfileId: null,
+  previewId: null, previewUrl: null, // canal en vista previa
   settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
@@ -333,6 +334,7 @@ function renderProfiles() {
       state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
       state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
       state.openSeries = null; state.openMovie = null;
+      closePreview();
       renderGroups(); renderChannels();
       $('active-source').textContent = 'Sin fuente';
     }
@@ -380,6 +382,7 @@ async function loadProfile(id) {
     state.vod = []; state.vodLoaded = false; state.vodCats = []; state.vodCat = null;
     state.series = []; state.seriesLoaded = false; state.seriesCats = []; state.seriesCat = null;
     state.openSeries = null; state.openMovie = null;
+    closePreview();
     $('active-source').textContent = 'Fuente: ' + p.name;
     renderGroups(); renderChannels();
     toast(`Listo: ${state.channels.length} canales`);
@@ -450,10 +453,11 @@ function filteredChannels() {
 function renderChannels() {
   const list = filteredChannels();
   const now = Date.now();
-  $('live-list').innerHTML = list.slice(0, 400).map(c => {
+  $('live-list').innerHTML = list.slice(0, 400).map((c, i) => {
     const prog = state.epg ? nowPlaying(state.epg.programs, channelEpgId(c), now) : null;
     const fav = state.favorites.has(c.id) ? '★' : '☆';
-    return `<div class="ch" data-id="${esc(c.id)}">
+    return `<div class="ch ${state.previewId === c.id ? 'sel' : ''}" data-id="${esc(c.id)}">
+      <span class="ch-num">${i + 1}</span>
       ${c.logo ? `<img src="${esc(c.logo)}" loading="lazy" onerror="this.remove()">` : '<div class="no-logo">📺</div>'}
       <div class="ch-info"><b>${esc(c.name)}</b><small>${esc(prog ? prog.title : c.group)}</small></div>
       <button class="fav" data-fav="${esc(c.id)}">${fav}</button>
@@ -464,7 +468,7 @@ function renderChannels() {
   $('live-list').querySelectorAll('.ch').forEach(el => {
     el.onclick = e => {
       if (e.target.dataset.fav) return;
-      playChannel(el.dataset.id);
+      showPreview(el.dataset.id);
     };
   });
   $('live-list').querySelectorAll('[data-fav]').forEach(b => b.onclick = async e => {
@@ -662,6 +666,7 @@ function updateTsUi() {
 
 function playStream(url, title = '') {
   stopPlayer();
+  stopPreview();
   $('now-playing').textContent = title;
   modal.dataset.url = url;
   modal.classList.remove('hidden');
@@ -686,9 +691,14 @@ $('btn-live').onclick = () => {
   }
 };
 
-$('btn-close').onclick = () => { stopPlayer(); modal.classList.add('hidden'); };
-$('btn-vlc').onclick = async () => {
-  const url = modal.dataset.url;
+$('btn-close').onclick = () => {
+  stopPlayer();
+  modal.classList.add('hidden');
+  if (state.previewId) showPreview(state.previewId); // retoma la vista previa
+};
+
+/** Abre una URL en VLC (o app predeterminada). La usan el reproductor y la vista previa. */
+async function openExternal(url) {
   if (!url) return;
   if (isTauri) {
     try {
@@ -698,7 +708,77 @@ $('btn-vlc').onclick = async () => {
     return;
   }
   window.open(url, '_blank');
-};
+}
+$('btn-vlc').onclick = () => openExternal(modal.dataset.url);
+
+// ------------------------------------------------- vista previa (TV en vivo)
+const pvVideo = $('pv-video');
+let pvHls = null, pvTs = null;
+
+function stopPreview() {
+  if (pvHls) { pvHls.destroy(); pvHls = null; }
+  if (pvTs) { pvTs.destroy(); pvTs = null; }
+  if (pvVideo) { pvVideo.pause(); pvVideo.removeAttribute('src'); pvVideo.load(); }
+}
+
+const hhmm = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/** Tocar un canal: lo reproduce en pequeño + ficha con lo que está al aire. */
+function showPreview(id) {
+  const ch = state.channels.find(c => c.id === id);
+  if (!ch) return;
+  const url = streamUrlFor(ch);
+  if (!url) return toast('Sin URL de stream');
+  state.previewId = id;
+  state.previewUrl = url;
+  stopPreview();
+  $('live-preview').classList.remove('hidden');
+  $('pv-name').textContent = ch.name;
+
+  const now = Date.now();
+  const prog = state.epg ? nowPlaying(state.epg.programs, channelEpgId(ch), now) : null;
+  if (prog) {
+    $('pv-meta').textContent = `${prog.title} · ${hhmm(prog.start)} - ${hhmm(prog.stop)}`;
+    $('pv-bar').style.width = Math.min(100, Math.max(0,
+      (now - prog.start) / Math.max(1, prog.stop - prog.start) * 100)) + '%';
+    $('pv-desc').textContent = prog.desc || '';
+    const next = programsFor(state.epg.programs, channelEpgId(ch), now, now + 3 * 3600000)
+      .filter(p => p.start >= now).slice(0, 4);
+    $('pv-next').innerHTML = next.map(p =>
+      `<div class="pv-next-row"><span>${hhmm(p.start)}</span><b>${esc(p.title)}</b></div>`).join('');
+  } else {
+    $('pv-meta').textContent = ch.group || '';
+    $('pv-bar').style.width = '0%';
+    $('pv-desc').textContent = '';
+    $('pv-next').innerHTML = '';
+  }
+
+  if (/\.m3u8($|\?)/.test(url) && window.Hls?.isSupported()) {
+    pvHls = new window.Hls({ maxBufferLength: 30 });
+    pvHls.loadSource(url); pvHls.attachMedia(pvVideo);
+  } else if (window.mpegts?.isSupported()) {
+    pvTs = window.mpegts.createPlayer({ type: 'mse', isLive: true, url });
+    pvTs.attachMediaElement(pvVideo); pvTs.load();
+  } else {
+    pvVideo.src = url;
+  }
+  pvVideo.play().catch(() => {});
+  document.querySelectorAll('#live-list .ch').forEach(el =>
+    el.classList.toggle('sel', el.dataset.id === id));
+}
+
+function closePreview() {
+  stopPreview();
+  state.previewId = null;
+  state.previewUrl = null;
+  $('live-preview').classList.add('hidden');
+  document.querySelectorAll('#live-list .ch.sel').forEach(el => el.classList.remove('sel'));
+}
+
+pvVideo.addEventListener('click', () => { if (state.previewId) playChannel(state.previewId); });
+$('pv-expand').onclick = () => { if (state.previewId) playChannel(state.previewId); };
+$('pv-vlc').onclick = () => openExternal(state.previewUrl);
+$('pv-close').onclick = closePreview;
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!$('info-modal').classList.contains('hidden')) $('info-modal').classList.add('hidden');

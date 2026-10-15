@@ -27,7 +27,24 @@
         <div id="groups"></div>
         <div class="live-main">
           <input id="live-search" placeholder="🔍 Buscar canal…">
-          <div id="live-list"></div>
+          <div class="live-cols">
+            <div id="live-list"></div>
+            <aside id="live-preview" class="hidden">
+              <video id="pv-video" playsinline title="Tocar para pantalla completa"></video>
+              <div class="pv-body">
+                <h3 id="pv-name"></h3>
+                <div id="pv-meta" class="meta"></div>
+                <div class="epg-d-progress"><div id="pv-bar"></div></div>
+                <p id="pv-desc"></p>
+                <div id="pv-next"></div>
+              </div>
+              <div class="pv-actions">
+                <button id="pv-expand">⛶ Pantalla completa</button>
+                <button id="pv-vlc">Abrir en VLC</button>
+                <button id="pv-close">✕</button>
+              </div>
+            </aside>
+          </div>
         </div>
       </div>
     </section>
