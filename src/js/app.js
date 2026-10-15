@@ -167,10 +167,17 @@ function renderSeriesGrid() {
 }
 
 /** Normaliza las temporadas de get_series_info a [[nombreTemporada, [episodios]]].
- *  Algunos proveedores devuelven objetos en vez de arreglos por temporada. */
+ *  OJO: `seasons` es metadato de temporadas (sin episodios); la lista real
+ *  de episodios por temporada viene en `episodes`. Por eso `episodes` manda. */
 function seasonsOf(info) {
-  const raw = info.seasons || info.episodes || {};
-  if (Array.isArray(raw)) return [['', raw]];
+  const raw = info.episodes || info.seasons || {};
+  if (Array.isArray(raw)) {
+    // Si es arreglo: ¿son episodios o metadato de temporadas?
+    // Los episodios tienen episode_num o id de episodio; el metadato no.
+    const looksEpisodes = raw.length && (raw[0].episode_num != null || raw[0].stream_id != null);
+    if (looksEpisodes) return [['', raw]];
+    return []; // metadato de temporadas sin `episodes`: nada que mostrar
+  }
   return Object.entries(raw).map(([sn, eps]) => [
     sn,
     Array.isArray(eps) ? eps : (eps && typeof eps === 'object' ? [eps] : []),
@@ -258,7 +265,7 @@ function renderSeriesDetail() {
       </div>
     </div>`;
   for (const [sn, eps] of seasons) {
-    html += `<h3>${sn ? 'Temporada ' + esc(sn) : 'Episodios'}</h3><div class="ep-grid">` + eps.map(ep => `
+    html += `<h3>${sn ? 'Temporada ' + esc(sn) + ` (${eps.length})` : `Episodios (${eps.length})`}</h3><div class="ep-grid">` + eps.map(ep => `
       <button class="ep" data-ep="${ep.id}">${esc(ep.episode_num ? 'E' + ep.episode_num + ' — ' : '')}${esc(ep.title || ('Episodio ' + (ep.episode_num || '')))}</button>`
     ).join('') + `</div>`;
   }
