@@ -870,6 +870,16 @@ function updateTsUi() {
   }
 }
 
+/** Decide el reproductor según la URL:
+ *  .m3u8 -> hls.js | .mp4/.mkv/.avi/... -> video nativo | resto (.ts, etc.) -> mpegts.js */
+function pickPlayer(url) {
+  const u = url.toLowerCase();
+  if (/\.m3u8($|\?)/.test(u) && window.Hls?.isSupported()) return 'hls';
+  if (/\.(mp4|m4v|mkv|avi|mov|webm)($|\?)/.test(u)) return 'native';
+  if (window.mpegts?.isSupported()) return 'ts';
+  return 'native';
+}
+
 function playStream(url, title = '') {
   stopPlayer();
   stopPreview();
@@ -882,15 +892,20 @@ function playStream(url, title = '') {
   modal.dataset.url = url;
   modal.classList.remove('hidden');
   updateTsUi();
-  if (/\.m3u8($|\?)/.test(url) && window.Hls?.isSupported()) {
+  const playerKind = pickPlayer(url);
+  if (playerKind === 'hls') {
     hls = new window.Hls(hlsConfig());
     hls.loadSource(url); hls.attachMedia(video);
     hls.on(window.Hls.Events.MANIFEST_PARSED, updateTsUi);
-  } else if (window.mpegts?.isSupported()) {
+    hls.on(window.Hls.Events.ERROR, (_, data) => {
+      if (data?.fatal) toast('Error de stream (HLS): ' + (data.details || 'desconocido'));
+    });
+  } else if (playerKind === 'ts') {
     tsPlayer = window.mpegts.createPlayer({ type: 'mse', isLive: true, url });
     tsPlayer.attachMediaElement(video); tsPlayer.load();
+    tsPlayer.on(window.mpegts.Events.ERROR, () => toast('Error de stream (MPEG-TS). Prueba "Abrir en VLC".'));
   } else {
-    video.src = url;
+    video.src = url; // nativo: mp4, mkv, etc. (películas y series)
   }
   const isHls = !!hls;
   $('btn-audio').style.display = isHls ? '' : 'none';
@@ -911,6 +926,12 @@ function playStream(url, title = '') {
 }
 
 video.addEventListener('timeupdate', updateTsUi);
+// Si el navegador no puede con el formato/códec, decirlo claro y sugerir VLC.
+video.addEventListener('error', () => {
+  if (video.error && !modal.classList.contains('hidden')) {
+    toast('El navegador no reproduce este formato o códec. Prueba "Abrir en VLC".');
+  }
+});
 $('btn-live').onclick = () => {
   if (hls && hls.liveSyncPosition != null && isFinite(hls.liveSyncPosition)) {
     video.currentTime = hls.liveSyncPosition;
