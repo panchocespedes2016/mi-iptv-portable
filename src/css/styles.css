@@ -166,6 +166,21 @@ h3 { margin: 22px 0 10px; color: var(--muted); font-size: .95rem; text-transform
 .ch-row img { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
 .ch-row .no-logo { width: 36px; height: 36px; font-size: 1.2rem; }
 .ch-row .ch-info { flex: 1; min-width: 0; }
+/* Menú de pistas (audio/subtítulos) en el reproductor */
+#track-menu { position: absolute; right: 16px; bottom: 64px; width: 280px; max-height: 50%;
+  overflow-y: auto; background: var(--panel); border: 1px solid #2c3947; border-radius: 10px;
+  padding: 12px; z-index: 9; }
+#track-menu.hidden { display: none; }
+#track-menu h4 { margin-bottom: 8px; }
+#track-menu-items button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+#track-menu-items button.sel { outline: 2px solid var(--accent); }
+/* Ajustes de subtítulos */
+.subs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px; margin-bottom: 16px; }
+.subs-grid label { display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
+.subs-grid label.chk { flex-direction: row; align-items: center; }
+.subs-grid input[type="color"] { width: 60px; height: 36px; padding: 2px; background: var(--panel);
+  border: 1px solid #2c3947; border-radius: 6px; }
 /* OSD: info que aparece al tocar el video en pantalla completa */
 #osd { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 #osd.hidden { display: none; }

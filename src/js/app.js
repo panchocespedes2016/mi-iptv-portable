@@ -17,6 +17,7 @@ const state = {
   previewId: null, previewUrl: null, // canal en vista previa
   playingCh: null, // canal sonando en el reproductor (para el OSD)
   settings: { timeshiftMinutes: 30 }, // timeshift en RAM (0 = desactivado)
+  // subs se completa en el arranque con DEF_SUBS
   vod: [], vodLoaded: false, vodSearch: '', vodCats: [], vodCat: null,
   series: [], seriesLoaded: false, seriesSearch: '', seriesCats: [], seriesCat: null,
   openSeries: null, // {info} serie abierta
@@ -698,6 +699,75 @@ function hlsConfig() {
   return cfg;
 }
 
+/** Aplica el estilo de subtítulos configurado (WebVTT ::cue). */
+function applySubsStyle() {
+  const s = state.settings.subs;
+  let st = document.getElementById('subs-style');
+  if (!st) { st = document.createElement('style'); st.id = 'subs-style'; document.head.appendChild(st); }
+  const alpha = Math.round((s.bgOpacity ?? 75) * 2.55).toString(16).padStart(2, '0');
+  st.textContent =
+    `#video::cue, #pv-video::cue, .mv-tile video::cue {` +
+    `font-family:'${s.font}',sans-serif;font-size:${s.size}px;color:${s.color};` +
+    `background-color:${s.bg}${alpha};font-weight:${s.bold ? 'bold' : 'normal'};}`;
+}
+
+const DEF_SUBS = { font: 'Arial', size: 24, color: '#ffffff', bg: '#000000', bgOpacity: 75, bold: false };
+
+function initSubsSettings() {
+  const s = state.settings.subs;
+  const set = (id, v) => { const el = $(id); if (el) el.value = v; };
+  set('sub-font', s.font); set('sub-size', String(s.size));
+  set('sub-color', s.color); set('sub-bg', s.bg); set('sub-opacity', s.bgOpacity);
+  const ov = $('sub-opacity-v'); if (ov) ov.textContent = s.bgOpacity + '%';
+  const bold = $('sub-bold'); if (bold) bold.checked = !!s.bold;
+  const save = async () => {
+    state.settings.subs = {
+      font: $('sub-font').value, size: +$('sub-size').value,
+      color: $('sub-color').value, bg: $('sub-bg').value,
+      bgOpacity: +$('sub-opacity').value, bold: $('sub-bold').checked,
+    };
+    $('sub-opacity-v').textContent = state.settings.subs.bgOpacity + '%';
+    applySubsStyle();
+    await saveProfiles();
+  };
+  ['sub-font', 'sub-size', 'sub-color', 'sub-bg', 'sub-bold'].forEach(id => {
+    const el = $(id); if (el) el.onchange = save;
+  });
+  const op = $('sub-opacity'); if (op) op.oninput = save;
+}
+
+/** Menú de pistas de audio / subtítulos del stream actual (solo HLS). */
+function trackMenu(kind) {
+  const menu = $('track-menu'), items = $('track-menu-items');
+  if (!menu.classList.contains('hidden') && menu.dataset.kind === kind) {
+    menu.classList.add('hidden'); return;
+  }
+  menu.dataset.kind = kind;
+  $('track-menu-title').textContent = kind === 'audio' ? '🎧 Pista de audio' : '💬 Subtítulos';
+  let rows = [];
+  if (hls) {
+    if (kind === 'audio') {
+      rows = (hls.audioTracks || []).map((t, i) =>
+        `<button data-i="${i}" class="${hls.audioTrack === i ? 'sel' : ''}">${esc(t.name || t.lang || 'Pista ' + (i + 1))}</button>`);
+    } else {
+      rows = [`<button data-i="-1" class="${hls.subtitleTrack === -1 ? 'sel' : ''}">Desactivados</button>`]
+        .concat((hls.subtitleTracks || []).map((t, i) =>
+          `<button data-i="${i}" class="${hls.subtitleTrack === i ? 'sel' : ''}">${esc(t.name || t.lang || 'Subtítulo ' + (i + 1))}</button>`));
+    }
+  }
+  if (!rows.length) rows = ['<p class="hint">Este stream no trae pistas múltiples.</p>'];
+  items.innerHTML = rows.join('');
+  items.querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (kind === 'audio') { hls.audioTrack = i; toast('Pista de audio cambiada'); }
+    else { hls.subtitleTrack = i; toast(i === -1 ? 'Subtítulos desactivados' : 'Subtítulos activados'); }
+    menu.classList.add('hidden');
+  });
+  menu.classList.remove('hidden');
+}
+$('btn-audio').onclick = () => trackMenu('audio');
+$('btn-subs').onclick = () => trackMenu('subs');
+
 /** Insignia "-MM:SS del en vivo" + botón ● EN VIVO (solo HLS en vivo). */
 function updateTsUi() {
   const badge = $('ts-delay'), btn = $('btn-live');
@@ -736,6 +806,21 @@ function playStream(url, title = '') {
     tsPlayer.attachMediaElement(video); tsPlayer.load();
   } else {
     video.src = url;
+  }
+  const isHls = !!hls;
+  $('btn-audio').style.display = isHls ? '' : 'none';
+  $('btn-subs').style.display = isHls ? '' : 'none';
+  $('track-menu').classList.add('hidden');
+  if (isHls) {
+    const refreshTracks = () => {
+      const menu = $('track-menu');
+      if (menu.classList.contains('hidden')) return;
+      const kind = menu.dataset.kind || 'audio';
+      menu.classList.add('hidden');
+      trackMenu(kind);
+    };
+    hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, refreshTracks);
+    hls.on(window.Hls.Events.SUBTITLE_TRACKS_UPDATED, refreshTracks);
   }
   video.play().catch(() => {});
 }
@@ -1037,6 +1122,9 @@ $('info-modal').addEventListener('click', e => {
   state.profiles = cfg.profiles || [];
   state.lastProfileId = cfg.lastProfile || null;
   state.settings = { timeshiftMinutes: 30, ...(cfg.settings || {}) };
+  state.settings.subs = { ...DEF_SUBS, ...((cfg.settings || {}).subs || {}) };
+  applySubsStyle();
+  initSubsSettings();
   const tsSel = $('ts-minutes');
   if (tsSel) {
     tsSel.value = String(state.settings.timeshiftMinutes);

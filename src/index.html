@@ -96,6 +96,29 @@
         <option value="120">120 minutos</option>
       </select>
       <p class="hint" id="datadir"></p>
+      <h3>Subtítulos</h3>
+      <p class="hint">Estilo de los subtítulos en el reproductor.</p>
+      <div class="subs-grid">
+        <label>Fuente
+          <select id="sub-font">
+            <option>Arial</option><option>Verdana</option><option>Tahoma</option>
+            <option>Trebuchet MS</option><option>Times New Roman</option><option>Courier New</option>
+          </select>
+        </label>
+        <label>Tamaño
+          <select id="sub-size">
+            <option value="18">Pequeño</option><option value="24">Mediano</option>
+            <option value="32">Grande</option><option value="44">Muy grande</option>
+          </select>
+        </label>
+        <label>Color del texto <input type="color" id="sub-color" value="#ffffff"></label>
+        <label>Color del fondo <input type="color" id="sub-bg" value="#000000"></label>
+        <label>Transparencia del fondo
+          <input type="range" id="sub-opacity" min="0" max="100" value="75">
+          <span id="sub-opacity-v">75%</span>
+        </label>
+        <label class="chk"><input type="checkbox" id="sub-bold"> Negrita</label>
+      </div>
     </section>
   </main>
 </div>
@@ -117,8 +140,14 @@
     <button id="btn-live" class="hidden live-btn">● EN VIVO</button>
     <button id="btn-chlist" title="Lista de canales">☰</button>
     <button id="btn-fav" class="fav" title="Favorito">☆</button>
+    <button id="btn-audio" title="Pista de audio">🎧</button>
+    <button id="btn-subs" title="Subtítulos">💬</button>
     <button id="btn-vlc">Abrir en VLC</button>
     <button id="btn-close">✕ Cerrar</button>
+  </div>
+  <div id="track-menu" class="hidden">
+    <h4 id="track-menu-title"></h4>
+    <div id="track-menu-items"></div>
   </div>
   <aside id="ch-list" class="hidden">
     <input id="ch-list-search" placeholder="🔍 Buscar canal…">
